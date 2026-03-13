@@ -1,0 +1,266 @@
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cluster nodes: 10
+Provided resources: disk_mb=50000
+Job stats:
+job                              count
+-----------------------------  -------
+all                                  1
+bam_to_bw                            4
+bam_to_macs2                         4
+placeholder_transition               4
+processed_fastq_to_sorted_bam        4
+raw_fastq_to_processed_fastq         4
+summarize_quality_metrics            4
+total                               25
+
+Select jobs to execute...
+
+[Mon Mar  2 13:18:49 2026]
+Job 30: Processing FASTQ
+Reason: Missing output files: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/fastq_counts/S2_AntHOX1a_PBX_HA_nexus_1_raw_reads.txt, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/fastq_counts/S2_AntHOX1a_PBX_HA_nexus_1_processed_reads.txt
+
+Submitted job 30 with external jobid 'Submitted batch job 4067695'.
+
+[Mon Mar  2 13:18:49 2026]
+Job 27: Processing FASTQ
+Reason: Missing output files: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/fastq_counts/S2_AntHOX1a_PBX_Flag_nexus_2_processed_reads.txt, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/fastq_counts/S2_AntHOX1a_PBX_Flag_nexus_2_raw_reads.txt
+
+Submitted job 27 with external jobid 'Submitted batch job 4067696'.
+
+[Mon Mar  2 13:18:49 2026]
+Job 24: Processing FASTQ
+Reason: Missing output files: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/fastq_counts/S2_AntHOX1a_PBX_Flag_nexus_1_raw_reads.txt, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/fastq_counts/S2_AntHOX1a_PBX_Flag_nexus_1_processed_reads.txt
+
+Submitted job 24 with external jobid 'Submitted batch job 4067697'.
+
+[Mon Mar  2 13:18:49 2026]
+Job 33: Processing FASTQ
+Reason: Missing output files: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/fastq_counts/S2_AntHOX1a_PBX_HA_nexus_2_processed_reads.txt, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/fastq_counts/S2_AntHOX1a_PBX_HA_nexus_2_raw_reads.txt
+
+Submitted job 33 with external jobid 'Submitted batch job 4067698'.
+[Mon Mar  2 13:49:31 2026]
+Finished job 24.
+1 of 25 steps (4%) done
+Select jobs to execute...
+
+[Mon Mar  2 13:49:31 2026]
+Job 23: Aligning FASTQ to BAM
+Reason: Missing output files: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bam/S2_AntHOX1a_PBX_Flag_nexus_1.bam; Input files updated by another job: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/fastq_counts/S2_AntHOX1a_PBX_Flag_nexus_1_processed_reads.txt
+
+Submitted job 23 with external jobid 'Submitted batch job 4067821'.
+[Mon Mar  2 13:54:11 2026]
+Finished job 30.
+2 of 25 steps (8%) done
+Select jobs to execute...
+
+[Mon Mar  2 13:54:11 2026]
+Job 29: Aligning FASTQ to BAM
+Reason: Missing output files: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bam/S2_AntHOX1a_PBX_HA_nexus_1.bam; Input files updated by another job: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/fastq_counts/S2_AntHOX1a_PBX_HA_nexus_1_processed_reads.txt
+
+Submitted job 29 with external jobid 'Submitted batch job 4067842'.
+[Mon Mar  2 14:03:52 2026]
+Finished job 33.
+3 of 25 steps (12%) done
+Select jobs to execute...
+
+[Mon Mar  2 14:03:52 2026]
+Job 32: Aligning FASTQ to BAM
+Reason: Missing output files: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bam/S2_AntHOX1a_PBX_HA_nexus_2.bam; Input files updated by another job: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/fastq_counts/S2_AntHOX1a_PBX_HA_nexus_2_processed_reads.txt
+
+Submitted job 32 with external jobid 'Submitted batch job 4067983'.
+[Mon Mar  2 14:08:32 2026]
+Finished job 27.
+4 of 25 steps (16%) done
+Select jobs to execute...
+
+[Mon Mar  2 14:08:32 2026]
+Job 26: Aligning FASTQ to BAM
+Reason: Missing output files: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bam/S2_AntHOX1a_PBX_Flag_nexus_2.bam; Input files updated by another job: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/fastq_counts/S2_AntHOX1a_PBX_Flag_nexus_2_processed_reads.txt
+
+Submitted job 26 with external jobid 'Submitted batch job 4068007'.
+[Mon Mar  2 14:12:22 2026]
+Finished job 23.
+5 of 25 steps (20%) done
+Select jobs to execute...
+
+[Mon Mar  2 14:12:22 2026]
+Job 41: Running MACS2...
+Reason: Missing output files: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/peaks/S2_AntHOX1a_PBX_Flag_nexus_1_peaks.narrowPeak; Input files updated by another job: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bam/S2_AntHOX1a_PBX_Flag_nexus_1.bam
+
+Submitted job 41 with external jobid 'Submitted batch job 4068013'.
+
+[Mon Mar  2 14:12:22 2026]
+Job 22: Computing coverage of .bam file...
+Reason: Missing output files: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bw/S2_AntHOX1a_PBX_Flag_nexus_1_positive.bw; Input files updated by another job: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bam/S2_AntHOX1a_PBX_Flag_nexus_1.bam
+
+Submitted job 22 with external jobid 'Submitted batch job 4068014'.
+[Mon Mar  2 14:16:33 2026]
+Finished job 22.
+6 of 25 steps (24%) done
+Select jobs to execute...
+
+[Mon Mar  2 14:16:33 2026]
+Job 60: Transitioning to uploading metrics...
+Reason: Missing output files: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/pipeline_transition/S2_AntHOX1a_PBX_Flag_nexus_1_touch.txt; Input files updated by another job: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bw/S2_AntHOX1a_PBX_Flag_nexus_1_positive.bw
+
+Submitted job 60 with external jobid 'Submitted batch job 4068040'.
+Waiting at most 120 seconds for missing files.
+[Mon Mar  2 14:17:33 2026]
+Finished job 60.
+7 of 25 steps (28%) done
+Select jobs to execute...
+
+[Mon Mar  2 14:17:33 2026]
+Job 59: Summarizing quality metrics and performing database upload...
+Reason: Missing output files: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/quality_metrics/S2_AntHOX1a_PBX_Flag_nexus_1_metrics.tsv; Input files updated by another job: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/fastq_counts/S2_AntHOX1a_PBX_Flag_nexus_1_raw_reads.txt, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/pipeline_transition/S2_AntHOX1a_PBX_Flag_nexus_1_touch.txt
+
+Submitted job 59 with external jobid 'Submitted batch job 4068048'.
+[Mon Mar  2 14:17:53 2026]
+Finished job 41.
+8 of 25 steps (32%) done
+[Mon Mar  2 14:25:53 2026]
+Finished job 29.
+9 of 25 steps (36%) done
+Select jobs to execute...
+
+[Mon Mar  2 14:25:53 2026]
+Job 28: Computing coverage of .bam file...
+Reason: Missing output files: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bw/S2_AntHOX1a_PBX_HA_nexus_1_positive.bw; Input files updated by another job: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bam/S2_AntHOX1a_PBX_HA_nexus_1.bam
+
+Submitted job 28 with external jobid 'Submitted batch job 4068075'.
+
+[Mon Mar  2 14:25:53 2026]
+Job 43: Running MACS2...
+Reason: Missing output files: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/peaks/S2_AntHOX1a_PBX_HA_nexus_1_peaks.narrowPeak; Input files updated by another job: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bam/S2_AntHOX1a_PBX_HA_nexus_1.bam
+
+Submitted job 43 with external jobid 'Submitted batch job 4068076'.
+[Mon Mar  2 14:25:53 2026]
+Finished job 59.
+10 of 25 steps (40%) done
+[Mon Mar  2 14:30:34 2026]
+Finished job 28.
+11 of 25 steps (44%) done
+Select jobs to execute...
+
+[Mon Mar  2 14:30:34 2026]
+Job 64: Transitioning to uploading metrics...
+Reason: Missing output files: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/pipeline_transition/S2_AntHOX1a_PBX_HA_nexus_1_touch.txt; Input files updated by another job: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bw/S2_AntHOX1a_PBX_HA_nexus_1_positive.bw
+
+Submitted job 64 with external jobid 'Submitted batch job 4068095'.
+Waiting at most 120 seconds for missing files.
+[Mon Mar  2 14:31:34 2026]
+Finished job 64.
+12 of 25 steps (48%) done
+Select jobs to execute...
+
+[Mon Mar  2 14:31:34 2026]
+Job 63: Summarizing quality metrics and performing database upload...
+Reason: Missing output files: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/quality_metrics/S2_AntHOX1a_PBX_HA_nexus_1_metrics.tsv; Input files updated by another job: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/fastq_counts/S2_AntHOX1a_PBX_HA_nexus_1_raw_reads.txt, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/pipeline_transition/S2_AntHOX1a_PBX_HA_nexus_1_touch.txt
+
+Submitted job 63 with external jobid 'Submitted batch job 4068101'.
+[Mon Mar  2 14:32:44 2026]
+Finished job 43.
+13 of 25 steps (52%) done
+[Mon Mar  2 14:43:45 2026]
+Finished job 63.
+14 of 25 steps (56%) done
+[Mon Mar  2 14:46:15 2026]
+Finished job 32.
+15 of 25 steps (60%) done
+Select jobs to execute...
+
+[Mon Mar  2 14:46:15 2026]
+Job 31: Computing coverage of .bam file...
+Reason: Missing output files: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bw/S2_AntHOX1a_PBX_HA_nexus_2_positive.bw; Input files updated by another job: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bam/S2_AntHOX1a_PBX_HA_nexus_2.bam
+
+Submitted job 31 with external jobid 'Submitted batch job 4068164'.
+
+[Mon Mar  2 14:46:15 2026]
+Job 44: Running MACS2...
+Reason: Missing output files: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/peaks/S2_AntHOX1a_PBX_HA_nexus_2_peaks.narrowPeak; Input files updated by another job: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bam/S2_AntHOX1a_PBX_HA_nexus_2.bam
+
+Submitted job 44 with external jobid 'Submitted batch job 4068165'.
+[Mon Mar  2 14:48:55 2026]
+Finished job 26.
+16 of 25 steps (64%) done
+Select jobs to execute...
+
+[Mon Mar  2 14:48:55 2026]
+Job 42: Running MACS2...
+Reason: Missing output files: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/peaks/S2_AntHOX1a_PBX_Flag_nexus_2_peaks.narrowPeak; Input files updated by another job: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bam/S2_AntHOX1a_PBX_Flag_nexus_2.bam
+
+Submitted job 42 with external jobid 'Submitted batch job 4068173'.
+
+[Mon Mar  2 14:48:55 2026]
+Job 25: Computing coverage of .bam file...
+Reason: Missing output files: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bw/S2_AntHOX1a_PBX_Flag_nexus_2_positive.bw; Input files updated by another job: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bam/S2_AntHOX1a_PBX_Flag_nexus_2.bam
+
+Submitted job 25 with external jobid 'Submitted batch job 4068174'.
+[Mon Mar  2 14:52:35 2026]
+Finished job 31.
+17 of 25 steps (68%) done
+Select jobs to execute...
+
+[Mon Mar  2 14:52:35 2026]
+Job 66: Transitioning to uploading metrics...
+Reason: Missing output files: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/pipeline_transition/S2_AntHOX1a_PBX_HA_nexus_2_touch.txt; Input files updated by another job: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bw/S2_AntHOX1a_PBX_HA_nexus_2_positive.bw
+
+Submitted job 66 with external jobid 'Submitted batch job 4068194'.
+Waiting at most 120 seconds for missing files.
+[Mon Mar  2 14:53:35 2026]
+Finished job 66.
+18 of 25 steps (72%) done
+Select jobs to execute...
+
+[Mon Mar  2 14:53:35 2026]
+Job 65: Summarizing quality metrics and performing database upload...
+Reason: Missing output files: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/quality_metrics/S2_AntHOX1a_PBX_HA_nexus_2_metrics.tsv; Input files updated by another job: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/pipeline_transition/S2_AntHOX1a_PBX_HA_nexus_2_touch.txt, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/fastq_counts/S2_AntHOX1a_PBX_HA_nexus_2_raw_reads.txt
+
+Submitted job 65 with external jobid 'Submitted batch job 4068198'.
+[Mon Mar  2 14:54:45 2026]
+Finished job 25.
+19 of 25 steps (76%) done
+Select jobs to execute...
+
+[Mon Mar  2 14:54:45 2026]
+Job 62: Transitioning to uploading metrics...
+Reason: Missing output files: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/pipeline_transition/S2_AntHOX1a_PBX_Flag_nexus_2_touch.txt; Input files updated by another job: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bw/S2_AntHOX1a_PBX_Flag_nexus_2_positive.bw
+
+Submitted job 62 with external jobid 'Submitted batch job 4068203'.
+Waiting at most 120 seconds for missing files.
+[Mon Mar  2 14:55:45 2026]
+Finished job 62.
+20 of 25 steps (80%) done
+Select jobs to execute...
+
+[Mon Mar  2 14:55:45 2026]
+Job 61: Summarizing quality metrics and performing database upload...
+Reason: Missing output files: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/quality_metrics/S2_AntHOX1a_PBX_Flag_nexus_2_metrics.tsv; Input files updated by another job: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/pipeline_transition/S2_AntHOX1a_PBX_Flag_nexus_2_touch.txt, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/fastq_counts/S2_AntHOX1a_PBX_Flag_nexus_2_raw_reads.txt
+
+Submitted job 61 with external jobid 'Submitted batch job 4068206'.
+[Mon Mar  2 14:55:45 2026]
+Finished job 44.
+21 of 25 steps (84%) done
+[Mon Mar  2 14:58:26 2026]
+Finished job 42.
+22 of 25 steps (88%) done
+[Mon Mar  2 15:08:56 2026]
+Finished job 65.
+23 of 25 steps (92%) done
+[Mon Mar  2 15:14:17 2026]
+Finished job 61.
+24 of 25 steps (96%) done
+Select jobs to execute...
+
+[Mon Mar  2 15:14:17 2026]
+localrule all:
+    input: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bw/S2_AntHOX6a_PBX_Flag_nexus_1_positive.bw, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bw/S2_AntHOX6a_PBX_Flag_nexus_2_positive.bw, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bw/S2_AntHOX6a_PBX_HA_nexus_1_positive.bw, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bw/S2_AntHOX6a_PBX_HA_nexus_2_positive.bw, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bw/S2_Dfd_Hth_anti_EXD_nexus_1_positive.bw, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bw/S2_Dfd_Hth_HA_nexus_1_positive.bw, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bw/S2_Dfd_Hth_HA_nexus_2_positive.bw, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bw/S2_AntHOX1a_PBX_Flag_nexus_1_positive.bw, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bw/S2_AntHOX1a_PBX_Flag_nexus_2_positive.bw, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bw/S2_AntHOX1a_PBX_HA_nexus_1_positive.bw, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bw/S2_AntHOX1a_PBX_HA_nexus_2_positive.bw, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/peaks/S2_AntHOX6a_PBX_Flag_nexus_1_peaks.narrowPeak, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/peaks/S2_AntHOX6a_PBX_Flag_nexus_2_peaks.narrowPeak, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/peaks/S2_AntHOX6a_PBX_HA_nexus_1_peaks.narrowPeak, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/peaks/S2_AntHOX6a_PBX_HA_nexus_2_peaks.narrowPeak, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/peaks/S2_Dfd_Hth_anti_EXD_nexus_1_peaks.narrowPeak, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/peaks/S2_Dfd_Hth_HA_nexus_1_peaks.narrowPeak, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/peaks/S2_Dfd_Hth_HA_nexus_2_peaks.narrowPeak, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/peaks/S2_AntHOX1a_PBX_Flag_nexus_1_peaks.narrowPeak, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/peaks/S2_AntHOX1a_PBX_Flag_nexus_2_peaks.narrowPeak, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/peaks/S2_AntHOX1a_PBX_HA_nexus_1_peaks.narrowPeak, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/peaks/S2_AntHOX1a_PBX_HA_nexus_2_peaks.narrowPeak, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/quality_metrics/S2_AntHOX6a_PBX_Flag_nexus_1_metrics.tsv, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/quality_metrics/S2_AntHOX6a_PBX_Flag_nexus_2_metrics.tsv, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/quality_metrics/S2_AntHOX6a_PBX_HA_nexus_1_metrics.tsv, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/quality_metrics/S2_AntHOX6a_PBX_HA_nexus_2_metrics.tsv, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/quality_metrics/S2_Dfd_Hth_anti_EXD_nexus_1_metrics.tsv, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/quality_metrics/S2_Dfd_Hth_HA_nexus_1_metrics.tsv, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/quality_metrics/S2_Dfd_Hth_HA_nexus_2_metrics.tsv, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/quality_metrics/S2_AntHOX1a_PBX_Flag_nexus_1_metrics.tsv, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/quality_metrics/S2_AntHOX1a_PBX_Flag_nexus_2_metrics.tsv, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/quality_metrics/S2_AntHOX1a_PBX_HA_nexus_1_metrics.tsv, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/quality_metrics/S2_AntHOX1a_PBX_HA_nexus_2_metrics.tsv
+    jobid: 0
+    reason: Input files updated by another job: /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/peaks/S2_AntHOX1a_PBX_HA_nexus_1_peaks.narrowPeak, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/quality_metrics/S2_AntHOX1a_PBX_Flag_nexus_1_metrics.tsv, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/peaks/S2_AntHOX1a_PBX_Flag_nexus_2_peaks.narrowPeak, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/peaks/S2_AntHOX1a_PBX_Flag_nexus_1_peaks.narrowPeak, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/peaks/S2_AntHOX1a_PBX_HA_nexus_2_peaks.narrowPeak, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bw/S2_AntHOX1a_PBX_Flag_nexus_1_positive.bw, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/quality_metrics/S2_AntHOX1a_PBX_HA_nexus_1_metrics.tsv, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/quality_metrics/S2_AntHOX1a_PBX_HA_nexus_2_metrics.tsv, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bw/S2_AntHOX1a_PBX_HA_nexus_1_positive.bw, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/logs/quality_metrics/S2_AntHOX1a_PBX_Flag_nexus_2_metrics.tsv, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bw/S2_AntHOX1a_PBX_Flag_nexus_2_positive.bw, /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/1_processing/bw/S2_AntHOX1a_PBX_HA_nexus_2_positive.bw
+    resources: mem_mb=500000, mem_mib=476838, disk_mb=50000, disk_mib=47684, tmpdir=/tmp, cpus_per_task=16, runtime=7000
+
+[Mon Mar  2 15:14:17 2026]
+Finished job 0.
+25 of 25 steps (100%) done
+Complete log: .snakemake/log/2026-03-02T131838.760746.snakemake.log

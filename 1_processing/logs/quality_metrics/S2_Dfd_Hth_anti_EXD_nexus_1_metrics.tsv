@@ -1,0 +1,2 @@
+sample_name	original_fastq_count	processed_fastq_count	unaligned_read_count	deduplicated_read_count	duplicated_read_count	uniqueness	genome_coverage	percent_sequenced
+S2_Dfd_Hth_anti_EXD_nexus_1	52209739	44442639	2806915	18027543	NA	NA	84	0.3777155489695485

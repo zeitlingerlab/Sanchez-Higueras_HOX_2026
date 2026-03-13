@@ -1,0 +1,2 @@
+sample_name	original_fastq_count	processed_fastq_count	unaligned_read_count	deduplicated_read_count	duplicated_read_count	uniqueness	genome_coverage	percent_sequenced
+S2_AntHOX6a_PBX_HA_nexus_1	128852395	116890747	10155157	70176112	NA	NA	93.7	0.3921640257970991

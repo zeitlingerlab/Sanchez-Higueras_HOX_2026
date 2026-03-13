@@ -1,0 +1,556 @@
+---
+title: 'Curation of motifs'
+author: "Melanie (1028-02098-001-001)"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output:
+  html_document:
+    depth: 3
+    theme: sandstone
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+  word_document:
+    toc: yes
+header-includes:
+- \usepackage{fancyhdr}
+- \usepackage{lipsum}
+- \pagestyle{fancy}
+- \fancyfoot[CO,CE]{1028-02098-001-001}
+- \fancyfoot[LE,RO]{\thepage}
+- \fancypagestyle{plain}{\pagestyle{fancy}}
+editor_options:
+  chunk_output_type: console
+---
+
+# Introduction
+
+The goal of this analysis is to:
+
+1. Showcase key motifs found by all binding models.
+2. Collect and filter motifs.
+3. Merge relevant motifs into sets for downstream analysis.
+4. Visualize motif summaries and representations.
+
+# Computational Setup
+
+```{r, warning=F, message=F}
+#Standard packages
+library(rtracklayer) ; library(GenomicRanges); library(magrittr) ; library(Biostrings)
+library(ggplot2) ; library(reshape2); library(plyranges); library(Rsamtools); library(parallel)
+library(dplyr); library(data.table); library(patchwork); library(readr); library(testit)
+
+#KNITR Options
+setwd("/n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/2_modeling/")
+figure_filepath<-'figures/5_curate_motifs'
+options(knitr.figure_dir=figure_filepath)
+
+#Lab sources
+source("scripts/r/granges_common.r")
+source("scripts/r/metapeak_common.r")
+source("scripts/r/knitr_common.r")
+source("scripts/r/caching.r")
+source("scripts/r/metapeak_functions.r")
+source("scripts/r/motif_functions.r")
+
+#Specific sources
+library(BSgenome.Dmelanogaster.UCSC.dm6)
+library(TxDb.Dmelanogaster.UCSC.dm6.ensGene)
+library(ggseqlogo)
+
+#Pre-existing variables
+threads <- 5
+dir.create('bed/mapped_motifs', recursive = T, showWarnings = F)
+dir.create('tsv/mapped_motifs', recursive = T, showWarnings = F)
+dir.create('rdata/mapped_motifs', recursive = T, showWarnings = F)
+bsgenome<-BSgenome.Dmelanogaster.UCSC.dm6
+txdb<-TxDb.Dmelanogaster.UCSC.dm6.ensGene
+
+#variable/model information
+output_length<-1000
+bg_freqs<-c(.27, .21, .21, .27)
+```
+
+# Define motifs
+
+Many motifs were found to be contributing but we will focus on the key specific motifs that produce precise TF footprinting. Please reference the `modiscolite` folder for more information and reports on all motifs.
+
+```{r}
+motifs.list<-list(
+  s2_anthox6a_pbx_flag_nexus_fold1_pbx_counts=list('pattern_1'=c('AntHox6a-PBX', 'pos')),
+  s2_anthox6a_pbx_ha_nexus_fold1_pbx_counts=list('pattern_0'=c('AntHox6a-PBX', 'pos')),
+  s2_anthox1a_pbx_flag_nexus_fold1_pbx_counts=list('pattern_2'=c('AntHox1a-PBX', 'pos')),
+  s2_anthox1a_pbx_ha_nexus_fold1_pbx_counts=list('pattern_5'=c('AntHox1a-PBX', 'neg'))
+  
+  # s2_dfd_hth_exd_nexus_fold1_dfd_counts = list('pattern_1' = c('AntHox6a-PBX', 'neg')),
+  # s2_dfd_hth_ha_nexus_fold1_dfd_counts = list('pattern_0' = c('TTAATGGC', 'pos'))
+)
+```
+
+# Import hits
+
+Import all hits from the key motifs of interest.
+
+```{r}
+hits.list<-lapply(names(motifs.list), function(x){
+  message(x)
+  info.df<-data.frame(pattern_name = names(motifs.list[[x]]), motif =  motifs.list[[x]][[1]][1], oriented_strand = motifs.list[[x]][[1]][2])
+  
+  hits.df<-paste0('modiscolite/', x, '/hits.tsv') %>% readr::read_tsv(.)
+  hits_filtered.df<-hits.df %>%
+    dplyr::mutate(model = x) %>%
+    dplyr::filter(pattern_name %in% names(motifs.list[[x]]), metacluster_name == 'pos_patterns') %>%
+    dplyr::left_join(info.df) %>%
+    as.data.frame
+  print(table(hits_filtered.df$motif))
+  return(hits_filtered.df)
+})
+names(hits.list)<-names(motifs.list)
+```
+
+# Curate motifs redundancy
+
+Remove the following redundancies:
+
++ Motifs that are peak-redundant will be mapped across peak "indexes" that are actually located across overlapping genomic regions. 
+  + In this case, we are mapping genome-wide, so this step isn't necessary for this exact reason, but we will leave it in because I'm paranoid.
++ Motifs that are palindromic will be mapped on the positive and negative strand with almost identical ranges. 
+  + Here, we will remove redundantly mapped motifs and select the unique motif maps that have the highest contribution.
+
+In order to simultaneously manage peak-redundancy and palindromic motifs, we will make miniature islands for each motif group to reduce them.
+
+```{r}
+hits_dedup.list<-lapply(names(hits.list), function(modisco_name){
+  #Orient strand to match desired aligned convention
+  gr<-makeGRangesFromDataFrame(hits.list[[modisco_name]], keep.extra.columns = T, starts.in.df.are.0based = T) %>%
+    plyranges::mutate(strand = ifelse(oriented_strand == 'neg',
+                                      ifelse(strand == '-', '+', '-'),
+                                      strand))
+
+  #Import peaks and reduce them to a deduplicated state to get general peak regions.
+  peaks.gr<-gr %>%
+    GenomicRanges::reduce(., ignore.strand = T) %>%
+    plyranges::mutate(region_id_tmp = 1:length(.))
+
+  #Find overlaps between motifs and peaks
+  ov<-findOverlaps(gr, peaks.gr, ignore.strand = T)
+
+  #Assign temporary region ID for deduplication
+  gr$region_id_tmp<-NA
+  gr$region_id_tmp[ov@from]<-peaks.gr$region_id_tmp[ov@to]
+
+  #Filter any motif that doesn't fit into peaks. These would be weird outliers, shouldn't happen, tbh.
+  gr<-gr %>% plyranges::filter(!is.na(gr$region_id_tmp))
+  
+  #Deduplicate any motifs for palindromic mappings
+  dedup.gr<-lapply(unique(gr$motif), function(y){
+    print(y)
+    motifs.gr<-gr %>% plyranges::filter(motif==y)
+    motifs_dedup.gr<-remove_palindromic_motifs_from_bpnet_instances(dfi = motifs.gr, 
+                                                                    pattern_to_filter = y, 
+                                                                    chrom_name = 'seqnames', start_name = 'start', end_name = 'end', 
+                                                                    value_name = 'contrib_match', motif_name = 'motif',
+                                                                    region_name = 'region_id_tmp')
+    print(paste0(length(motifs_dedup.gr) , ' kept from ', length(motifs.gr)))
+    return(motifs_dedup.gr)
+  }) %>% as('GRangesList') %>% unlist(.)
+  return(dedup.gr)
+})
+names(hits_dedup.list)<-names(hits.list)
+```
+
+Unwrap hits from a list.
+
+```{r}
+hits.gr<-hits_dedup.list %>% as('GRangesList') %>% unlist()
+names(hits.gr)<-NULL
+```
+
+Format the motifs.
+
+```{r}
+all_motifs.gr<-hits.gr %>%
+  plyranges::mutate(motif_id = 0:(length(.)-1), #0-based indexing later might come in handy
+                    seq = getSeq(bsgenome, ., as.character = T))
+```
+
+# Export curated motifs
+
+Show final results of motifs returned:
+
+```{r}
+table(all_motifs.gr$motif, all_motifs.gr$model)
+```
+
+Export curated motifs. In the subsequent .bed file it will be the `[task]_[motif_id]_[region_id]` naming convention.
+
+```{r}
+#1-based
+motifs.df<-all_motifs.gr %>% as.data.frame()
+readr::write_tsv(motifs.df, paste0('tsv/mapped_motifs/all_instances_curated_1based.tsv.gz'))
+
+#0-based
+lapply(names(hits_dedup.list), function(x){
+  message(x)
+  all_motifs.gr %>% plyranges::filter(model==x) %>% plyranges::mutate(name = motif) %>%
+    rtracklayer::export(., 
+                        paste0('bed/mapped_motifs/all_instances_curated_', x, '_0based.bed'))
+})
+
+```
+
+Examine how many motifs show different sequences.
+
+```{r}
+all_motifs.gr %>%
+  as.data.frame %>%
+  dplyr::group_by(model, motif) %>%
+  dplyr::slice_max(order_by = contrib_match, n = 250) %>%
+  dplyr::summarize(TGATTAAT = sum(grepl('TGATTAAT', seq)),
+                   TGATTGAT = sum(grepl('TGATTGAT', seq)),
+                   total_motifs = dplyr::n())
+```
+
+
+# Visualize PWMs and CWMs from TF-MoDISco
+
+```{r}
+# system(paste0('rm ', figure_filepath, '/unaligned_seqlets/seqlet_logo_*'))
+
+#Plot all seqlet PWM and CWM logos
+pwm_and_cwm.logo.list<-lapply(all_motifs.gr$model %>% unique, function(x){
+  
+  info.df<-data.frame(pattern_name = names(motifs.list[[x]]), motif =  motifs.list[[x]][[1]][1], oriented_strand = motifs.list[[x]][[1]][2])
+  
+  s.hdf5<-rhdf5::h5read(paste0('modiscolite/', x, '/modisco.h5'),
+                        paste0('pos_patterns/', info.df$pattern_name))
+  cwm<-s.hdf5$contrib_scores
+  pwm<-ppm_to_ic(s.hdf5$sequence, bg_freq = c(.3, .2, .2, .3))
+  
+  #Orient strand
+  if(info.df$oriented_strand=='neg'){
+    cwm<-cwm[nrow(cwm):1,ncol(cwm):1]
+    pwm<-pwm[nrow(pwm):1,ncol(pwm):1]
+  }
+  
+  rownames(cwm)<-c('A','C','G','T')
+  rownames(pwm)<-c('A','C','G','T')
+  pwm_and_cwm.list<-list(pwm = pwm, cwm = cwm)
+  y_prefix<-paste0(x %>% gsub('_fold1', '', .) %>% gsub('_pbx_counts', '', .) %>% gsub('_dfd_counts', '', .))
+  names(pwm_and_cwm.list)<-paste0(y_prefix, c('_pwm', '_cwm'))
+  
+  pwm_and_cwm.logo<-ggseqlogo(pwm_and_cwm.list, method='custom', seq_type='dna') + 
+    facet_wrap(~seq_group, nrow = 1, scales='free') +
+    theme(axis.text.x = element_blank())
+
+  return(pwm_and_cwm.logo)
+})
+
+pwm_and_cwm_all.logo<-wrap_plots(pwm_and_cwm.logo.list, ncol = 1)
+ggsave(paste0(figure_filepath, '/seqlet_logos.png'), pwm_and_cwm_all.logo, height = 8, width = 10)
+ggsave(paste0(figure_filepath, '/seqlet_logos.pdf'), pwm_and_cwm_all.logo, height = 8, width = 10)
+```
+
+# Visualize ChIP-nexus coverage
+
+Given the set of motifs, what do ChIP-nexus heatmaps look like across the top motifs per logo?
+
+## Allocate coverage and settings
+
+```{r}
+nexus_bw.list<-list(
+  S2_AntHOX6a_PBX_Flag = list(pos = 'bw/S2_AntHOX6a_PBX_Flag_nexus_combined_positive.bw',
+                              neg = 'bw/S2_AntHOX6a_PBX_Flag_nexus_combined_negative.bw') %>%
+    mclapply(., function(x) {rtracklayer::import.bw(x, as="RleList")}, mc.cores = 2),
+  S2_AntHOX6a_PBX_HA = list(pos = 'bw/S2_AntHOX6a_PBX_HA_nexus_combined_positive.bw',
+                            neg = 'bw/S2_AntHOX6a_PBX_HA_nexus_combined_negative.bw') %>%
+    mclapply(., function(x) {rtracklayer::import.bw(x, as="RleList")}, mc.cores = 2),
+  
+  S2_AntHOX1a_PBX_Flag = list(pos = 'bw/S2_AntHOX1a_PBX_Flag_nexus_combined_positive.bw',
+                              neg = 'bw/S2_AntHOX1a_PBX_Flag_nexus_combined_negative.bw') %>%
+    mclapply(., function(x) {rtracklayer::import.bw(x, as="RleList")}, mc.cores = 2),
+  S2_AntHOX1a_PBX_HA = list(pos = 'bw/S2_AntHOX1a_PBX_HA_nexus_combined_positive.bw',
+                            neg = 'bw/S2_AntHOX1a_PBX_HA_nexus_combined_negative.bw') %>%
+    mclapply(., function(x) {rtracklayer::import.bw(x, as="RleList")}, mc.cores = 2)
+  
+  # S2_Dfd_Hth_HA = list(pos = 'bw/S2_Dfd_Hth_HA_nexus_combined_positive.bw',
+  #                      neg = 'bw/S2_Dfd_Hth_HA_nexus_combined_negative.bw') %>%
+  #   mclapply(., function(x) {rtracklayer::import.bw(x, as="RleList")}, mc.cores = 2),
+  # S2_Dfd_Hth_anti_EXD = list(pos = 'bw/S2_Dfd_Hth_anti_EXD_nexus_combined_positive.bw',
+  #                             neg = 'bw/S2_Dfd_Hth_anti_EXD_nexus_combined_negative.bw') %>%
+  #   mclapply(., function(x) {rtracklayer::import.bw(x, as="RleList")}, mc.cores = 2)
+  )
+
+#Define how many motifs to consider
+top_n = 250
+```
+
+## Plot coverage
+
+```{r}
+hm_plot_all.list<-lapply(all_motifs.gr$model %>% unique, function(x){
+  message(x)
+  m.gr<-all_motifs.gr %>% plyranges::filter(model==x) %>% plyranges::arrange(desc(contrib_match)) %>% 
+    head(n=top_n) %>% 
+    plyranges::arrange(contrib_match)
+  print(m.gr$seq %>% table %>% sort(decreasing = T))
+  
+  plots_across_motif.list<-mclapply(names(nexus_bw.list), function(y){
+    nexus.df<-plot_nexus_heatmap(regions.gr = GenomicRanges::resize(m.gr, width = 1, fix = 'center'), 
+                                   sample = nexus_bw.list[[y]], upstream = 150, downstream = 151, 
+                                   title = y, order = 'asis', removal_threshold = .8, normalize_threshold = .999,
+                                   return_only_df = T) #.8, .99
+    
+    nexus.plot<-ggplot()+
+      geom_tile(data=nexus.df %>% dplyr::filter(strand == 'pos'), aes(x=position, y=region, fill=signal))+
+      geom_tile(data=nexus.df %>% dplyr::filter(strand == 'neg'), aes(x=position, y=region, fill=-signal), alpha=.5)+
+      ggtitle(paste0('Motif: ', m.gr$motif %>% unique, '\nfrom model\n', x), subtitle = paste0('ChIP: ', y))+
+      scale_x_continuous("Position (bp)", expand = c(0, 0))+
+      scale_y_continuous("Regions", expand = c(0, 0))+
+      scale_fill_gradientn(colors = c('#08306b', '#08519c' , '#2171b5', '#4292c6', '#6baed6',
+                                      '#9ecae1', '#c6dbef','#deebf7', '#f7fbff', "white", '#fff5f0',
+                                      '#fee0d2','#fcbba1','#fc9272','#fb6a4a','#ef3b2c','#cb181d','#a50f15','#67000d'), name = "norm. signal") +
+      theme_classic()+
+      theme(text=element_text(size=14), legend.position = "none", panel.grid = element_blank(), panel.border = element_blank())
+    return(nexus.plot)
+  }, mc.cores = 4)
+  
+  hm.plot<-wrap_plots(plots_across_motif.list, nrow = 1) 
+  return(hm.plot)
+})
+
+hm_all.plot<-wrap_plots(hm_plot_all.list, ncol = 1) 
+ggsave(paste0(figure_filepath, '/nexus_heatmap_across_all_motifs.png'), hm_all.plot, height = 16, width = 16)
+ggsave(paste0(figure_filepath, '/nexus_heatmap_across_all_motifs.pdf'), hm_all.plot, height = 16, width = 16)
+```
+
+Report underlying sequences.
+
+```{r}
+lapply(all_motifs.gr$model %>% unique, function(x){
+  message(x)
+  m.gr<-all_motifs.gr %>% plyranges::filter(model==x) %>% plyranges::arrange(desc(contrib_match)) %>% 
+    head(n=top_n) %>% 
+    plyranges::arrange(contrib_match)
+  print(m.gr$seq %>% table %>% sort(decreasing = T)) %>% head(n=5)
+})
+```
+
+
+## Clarify coverage by sequence
+
+Does Dfd-HA bind in exclusively heterodimeric or monomeric conformations? Sort upstream sequences from the TTAAT core and check.
+
+```{r}
+# all_motifs.gr %>% plyranges::filter(model=='s2_dfd_hth_ha_nexus_fold1_dfd_counts') %>% as.data.frame %>% ggplot(., aes(x = contrib_magnitude))+geom_density()
+# 
+# m.gr<-all_motifs.gr %>% plyranges::filter(model=='s2_dfd_hth_ha_nexus_fold1_dfd_counts') %>% 
+#   plyranges::filter(contrib_magnitude>=0.1) %>%
+#   plyranges::mutate(upstream_seq = getSeq(bsgenome, 
+#                                           GenomicRanges::resize(
+#                                             GenomicRanges::resize(
+#                                               GenomicRanges::resize(., 1, 'start'), 4, 'end'), 3, 'start'))) %>%
+#   plyranges::arrange(upstream_seq, desc(contrib_match))
+# 
+# 
+# seq.list<-plot_sequence(m.gr, title = 'Dfd motifs', genome = bsgenome, window = 15, show = F)
+# seq.plot<-seq.list$plot
+# 
+# nexus.df<-plot_nexus_heatmap(regions.gr = GenomicRanges::resize(m.gr, width = 1, fix = 'center'), 
+#                                    sample = nexus_bw.list$S2_Dfd_Hth_HA, upstream = 150, downstream = 151, 
+#                                    title = y, order = 'asis', removal_threshold = .8, normalize_threshold = .99,
+#                                    return_only_df = T)
+#     
+# nexus.plot<-ggplot()+
+#   geom_tile(data=nexus.df %>% dplyr::filter(strand == 'pos'), aes(x=position, y=region, fill=signal))+
+#   geom_tile(data=nexus.df %>% dplyr::filter(strand == 'neg'), aes(x=position, y=region, fill=-signal), alpha=.5)+
+#   ggtitle(paste0('Sequence separated motif'))+
+#   scale_x_continuous("Position (bp)", expand = c(0, 0))+
+#   scale_y_continuous("Regions", expand = c(0, 0))+
+#   scale_fill_gradientn(colors = c('#08306b', '#08519c' , '#2171b5', '#4292c6', '#6baed6',
+#                                   '#9ecae1', '#c6dbef','#deebf7', '#f7fbff', "white", '#fff5f0',
+#                                   '#fee0d2','#fcbba1','#fc9272','#fb6a4a','#ef3b2c','#cb181d','#a50f15','#67000d'), 
+#                        name = "norm. signal") +
+#   theme_classic()+
+#   theme(text=element_text(size=14), legend.position = "none", panel.grid = element_blank(), panel.border = element_blank())
+# 
+# seq_separated.plot<-seq.plot + nexus.plot
+# seq_separated.plot
+# ggsave(paste0(figure_filepath, '/nexus_heatmap_across_seq_separated_dfd.png'), seq_separated.plot, height = 6, width = 12)
+# ggsave(paste0(figure_filepath, '/nexus_heatmap_across_seq_separated_dfd.pdf'), seq_separated.plot, height = 6, width = 12)
+```
+
+Find where the precise upper footprints are.
+
+```{r}
+# mp.plot<-plot_nexus_metapeak(GenomicRanges::resize(m.gr, 1, 'center'), nexus_bw.list$S2_Dfd_Hth_HA)
+# mp.plot + theme_bw()
+
+```
+
+```{r}
+# #Collect positive strand coverage
+# m_w_peaks.gr<-m.gr %>% 
+#   keepStandardChromosomes(.) %>%
+#   plyranges::mutate(monomeric_peak = regionSums(GenomicRanges::resize(., 3, 'center'), nexus_bw.list$S2_Dfd_Hth_HA$pos),
+#                     hereodimeric_peak = regionSums(GenomicRanges::resize(GenomicRanges::resize(GenomicRanges::resize(., 1, 'center'), 12, 'end'), 3, 'start'), nexus_bw.list$S2_Dfd_Hth_HA$pos))
+# 
+# #Contrast positive strand coverage
+# 
+# cor(m_w_peaks.gr$monomeric_peak, m_w_peaks.gr$hereodimeric_peak)
+# 
+# ggplot(m_w_peaks.gr %>% as.data.frame, aes(x = monomeric_peak, y = hereodimeric_peak))+
+#   geom_point() + 
+#   scale_x_continuous(limits = c(0, 200))+
+#   scale_y_continuous(limits = c(0, 200))
+                    
+```
+
+Seems like there is no hidden upstream heterodimeric component for this experiment.
+
+# Visualize predictions across key locus
+
+Here, Carlos chose to showcase the in vivo ChIP-nexus specificity at the following locus: ush (chr2L: 515500-516000)
+
+## Allocate coverage
+
+Given the fold that uses this for the test set in training, we generate data here that predicts this (fold2).
+
+```{r}
+pred.bw.list<-list(
+  S2_AntHOX6a_PBX_Flag = list(pos = 'preds/s2_anthox6a_pbx_flag_nexus_fold2_pbx_pos_all.bw',
+                              neg = 'preds/s2_anthox6a_pbx_flag_nexus_fold2_pbx_neg_all.bw') %>%
+    mclapply(., function(x) {rtracklayer::import.bw(x, as="RleList")}, mc.cores = 2),
+  S2_AntHOX6a_PBX_HA = list(pos = 'preds/s2_anthox6a_pbx_ha_nexus_fold2_pbx_pos_all.bw',
+                            neg = 'preds/s2_anthox6a_pbx_ha_nexus_fold2_pbx_neg_all.bw') %>%
+    mclapply(., function(x) {rtracklayer::import.bw(x, as="RleList")}, mc.cores = 2),
+  
+  S2_AntHOX1a_PBX_Flag = list(pos = 'preds/s2_anthox1a_pbx_flag_nexus_fold2_pbx_pos_all.bw',
+                              neg = 'preds/s2_anthox1a_pbx_flag_nexus_fold2_pbx_neg_all.bw') %>%
+    mclapply(., function(x) {rtracklayer::import.bw(x, as="RleList")}, mc.cores = 2),
+  S2_AntHOX1a_PBX_HA = list(pos = 'preds/s2_anthox1a_pbx_ha_nexus_fold2_pbx_pos_all.bw',
+                            neg = 'preds/s2_anthox1a_pbx_ha_nexus_fold2_pbx_neg_all.bw') %>%
+    mclapply(., function(x) {rtracklayer::import.bw(x, as="RleList")}, mc.cores = 2)
+  
+  # S2_Dfd_Hth_anti_EXD = list(pos = 'preds/s2_dfd_hth_exd_nexus_fold2_dfd_pos_all.bw',
+  #                            neg = 'preds/s2_dfd_hth_exd_nexus_fold2_dfd_neg_all.bw') %>%
+  #   mclapply(., function(x) {rtracklayer::import.bw(x, as="RleList")}, mc.cores = 2),
+  # S2_Dfd_Hth_HA = list(pos = 'preds/s2_dfd_hth_ha_nexus_fold2_dfd_pos_all.bw',
+  #                      neg = 'preds/s2_dfd_hth_ha_nexus_fold2_dfd_neg_all.bw') %>%
+  #   mclapply(., function(x) {rtracklayer::import.bw(x, as="RleList")}, mc.cores = 2)
+)
+
+locus.list<-list(
+  anthox6a = GRanges('chr2L', IRanges(516200, 516600), strand = '*'),
+  anthox1a = GRanges('chr2R', IRanges(21027100, 21027200), strand = '*')
+  # dfd =  GRanges('chr2L', IRanges(14565500, 14565800), strand = '*')
+)
+
+contrib.bw.list<-list(
+  S2_AntHOX6a_PBX_Flag = 'shap/s2_anthox6a_pbx_flag_nexus_fold1_pbx_counts.bw' %>% rtracklayer::import.bw(., as="RleList"),
+  S2_AntHOX6a_PBX_HA = 'shap/s2_anthox6a_pbx_ha_nexus_fold1_pbx_counts.bw' %>% rtracklayer::import.bw(., as="RleList"),
+  
+  S2_AntHOX1a_PBX_Flag = 'shap/s2_anthox1a_pbx_flag_nexus_fold1_pbx_counts.bw' %>% rtracklayer::import.bw(., as="RleList"),
+  S2_AntHOX1a_PBX_HA = 'shap/s2_anthox1a_pbx_ha_nexus_fold1_pbx_counts.bw' %>% rtracklayer::import.bw(., as="RleList")
+)
+
+```
+
+## Visualize predictions
+
+```{r}
+lapply(names(locus.list), function(x){
+  message(x)
+  
+  locus.gr<-locus.list[[x]]
+  
+  #Collect contribution scores
+  tracks<-names(contrib.bw.list)[grepl(x, tolower(names(contrib.bw.list)))]
+  
+  contrib.mat.list<-lapply(tracks, function(y){
+    df<-data.frame(
+      signal = standard_metapeak(GenomicRanges::resize(locus.gr, width = 1, fix = 'center'), contrib.bw.list[[y]],
+                                 upstream = floor(width(locus.gr)/2), downstream = ceiling(width(locus.gr)/2)) %>% .$reads,
+      seq = stringr::str_split(string = getSeq(bsgenome, locus.gr, as.character = T), pattern = '') %>% unlist()
+    ) %>%
+      dplyr::mutate(row = 1:nrow(.)) %>%
+      tidyr::pivot_wider(id_cols = row, names_from = seq, values_from = signal) %>%
+      dplyr::arrange(row)
+    df[is.na(df)]<-0
+    
+    mat<-df %>% dplyr::select(A, C, G, T) %>% as.matrix
+    mat[is.na(mat)]<-0
+    mat<-t(mat)
+    return(mat)
+  })
+  names(contrib.mat.list)<-tracks
+  
+  logos.plot<-ggseqlogo(contrib.mat.list, method='custom', seq_type='dna') +
+    theme_logo() + 
+    facet_wrap(~seq_group, ncol=1, scales='free_x') +
+    theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+  ggsave(paste0(figure_filepath, '/featured_locus_logos_', x, '.png'), logos.plot, height = 6, width = 12)
+  ggsave(paste0(figure_filepath, '/featured_locus_logos_', x, '.pdf'), logos.plot, height = 6, width = 12)
+  
+  
+  #Collect prediction scores
+  tracks<-names(pred.bw.list)[grepl(x, tolower(names(pred.bw.list)))]
+  
+  preds_all.df<-mclapply(tracks, function(y){
+    preds.df<-exo_metapeak(gr = GenomicRanges::resize(locus.gr, width = 1, fix = 'center'), sample = pred.bw.list[[y]], 
+                           upstream = floor(width(locus.gr)/2), downstream = ceiling(width(locus.gr)/2)) %>%
+      dplyr::mutate(genomic_coordinate = start(GenomicRanges::resize(locus.gr, width = 1, fix = 'center')) + tss_distance,
+                    sample = y, type = 'predicted ChIP-nexus')
+    return(preds.df)
+  }, mc.cores = 2) %>% rbindlist()
+  
+  obs_all.df<-mclapply(tracks, function(y){
+    obs.df<-exo_metapeak(gr = GenomicRanges::resize(locus.gr, width = 1, fix = 'center'), sample = nexus_bw.list[[y]], 
+                           upstream = floor(width(locus.gr)/2), downstream = ceiling(width(locus.gr)/2)) %>%
+      dplyr::mutate(genomic_coordinate = start(GenomicRanges::resize(locus.gr, width = 1, fix = 'center')) + tss_distance,
+                    sample = y, type = 'observed ChIP-nexus')
+    return(obs.df)
+  }, mc.cores = 2) %>% rbindlist()
+  
+  all.df<-rbind(preds_all.df, obs_all.df) 
+  
+  pred.plot<-ggplot(all.df, aes(genomic_coordinate, reads))+
+    geom_area(aes(group=interaction(sample,strand), fill = type))+
+    ggtitle(x)+
+    scale_x_continuous(name = "Position (chr2L, bp)")+
+    scale_y_continuous(name = "Reads")+
+    scale_fill_manual(values = c('#e08214','#8073ac'), name = "ChIP") +
+    facet_wrap(type ~ sample, scale = 'free')+
+    theme_classic()+
+    theme(text=element_text(size=14))
+  pred.plot
+  
+  ggsave(paste0(figure_filepath, '/featured_locus_predictions_', x, '.png'), pred.plot, height = 6, width = 12)
+  ggsave(paste0(figure_filepath, '/featured_locus_predictions_', x, '.pdf'), pred.plot, height = 6, width = 12)
+  
+})
+```
+
+# Conclusions
+
+In conclusion, motifs were curated based on multiple redundancies and saved to 1-based and 0-based coordinates. These will be the reference motifs that we base subsequent analysis on.
+
+# Session Information
+
+For the purposes of reproducibility, the R/Bioconductor session information is printed below:
+
+```{r sessioninfo}
+sessionInfo()
+```
+
+
+
+
+
+
+
+
+
+
+
+

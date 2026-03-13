@@ -1,0 +1,238 @@
+---
+title: 'Data preparation'
+author: "Melanie (1028-02098-001-001)"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output:
+  html_document:
+    depth: 3
+    theme: sandstone
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+  word_document:
+    toc: yes
+header-includes:
+- \usepackage{fancyhdr}
+- \usepackage{lipsum}
+- \pagestyle{fancy}
+- \fancyfoot[CO,CE]{1028-02098-001-001}
+- \fancyfoot[LE,RO]{\thepage}
+- \fancypagestyle{plain}{\pagestyle{fancy}}
+editor_options:
+  chunk_output_type: console
+---
+
+# Introduction
+
+The goal of this .Rmd is to prepare all aligned samples and published data for deep learning training and downstream analysis. 
+
+# Computational Setup
+
+```{r, warning=F, message=F}
+#Standard packages
+library(rtracklayer) ; library(GenomicRanges); library(magrittr) ; library(Biostrings)
+library(ggplot2) ; library(reshape2); library(plyranges); library(Rsamtools); library(parallel)
+library(dplyr); library(data.table); library(patchwork); library(readr); library(testit)
+
+#KNITR Options
+setwd("/n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/2_modeling/")
+figure_filepath<-'figures/1_prepare_data'
+options(knitr.figure_dir=figure_filepath)
+
+#Lab sources
+source("/n/projects/mw2098/shared_code/rscripts/granges_common.r")
+source("/n/projects/mw2098/shared_code/rscripts/metapeak_common.r")
+source("/n/projects/mw2098/shared_code/rscripts/knitr_common.r")
+source("/n/projects/mw2098/shared_code/rscripts/caching.r")
+source("/n/projects/mw2098/shared_code/custom/metapeak_functions.R")
+
+#Specific sources
+library(BSgenome.Dmelanogaster.UCSC.dm6)
+library(TxDb.Dmelanogaster.UCSC.dm6.ensGene)
+
+#Options and configurations
+dir.create('bw', showWarnings = F)
+dir.create('idr', showWarnings = F)
+dir.create('bam', showWarnings = F)
+dir.create('macs2', showWarnings = F)
+dir.create('inps/bed/', recursive = T, showWarnings = F)
+dir.create('inps/output/', recursive = T, showWarnings = F)
+dir.create('scripts/processing', showWarnings = F, recursive = T)
+
+#Custom variables
+bsgenome<-BSgenome.Dmelanogaster.UCSC.dm6
+samples.xlsx<-'../0_setup/1_define_samples.xlsx'
+
+dir.create('tsv/quality', showWarnings = F, recursive = T)
+```
+
+# Import sample names
+
+```{r}
+samples.df<-readxl::read_xlsx(samples.xlsx) %>% as.data.frame %>%
+  dplyr::mutate(sample_group = sub("_[^_]+$", "", sample_name),
+                sample_rep = stringr::str_extract(pattern = "_[^_]+$", gsub('rep', '', sample_name)) %>% 
+                  gsub('_', '', .) %>% 
+                  as.integer())
+```
+
+# Generate reproducible set of peaks
+
+## Pool sample reads for peak calling
+
+In order to create an oracle peak set for reproducible peak calling, pool samples. This is done here, for the sake of simplicity.
+
+```{r}
+pool_cmds.vec<-samples.df %>%
+  dplyr::group_by(sample_group) %>%
+  dplyr::summarize(freq = dplyr::n(),
+                   cmd = paste0('samtools merge --threads 12 bam/', sample_group, '_combined.bam ', 
+                                paste0('../1_processing/bam/', sample_name, '.bam', collapse = ' '))) %>%
+  dplyr::filter(freq>1)
+c('#!/bin/bash', 'ml zeitlinger', paste0('cd ', getwd()), pool_cmds.vec$cmd %>% unique) %>% writeLines(., 'scripts/processing/pool_aligned_replicates.sh')
+```
+
+```{bash, eval = F}
+cd /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/2_modeling
+ml simr
+sbuild -c 12 -m 200GB --submit scripts/processing/pool_aligned_replicates.sh
+```
+
+## Generate pooled peaks
+
+```{r}
+peak_cmds.df<-samples.df %>%
+  dplyr::filter(!grepl('mnase', sample_group)) %>%
+  dplyr::group_by(sample_group) %>%
+  dplyr::summarize(freq = dplyr::n(),,
+                   cmd = ifelse(unique(experiment)=='ATAC-seq',
+                                paste0('macs2 callpeak -f BAMPE -t bam/', sample_group, '_combined.bam --outdir macs2 -n ', sample_group),
+                                paste0('macs2 callpeak -f BAM --keep-dup all --nomodel --shift -75 --extsize 150 -t bam/', sample_group, '_combined.bam --outdir macs2 -n ', sample_group))) %>%
+  dplyr::filter(freq>1)
+
+c('#!/bin/bash', 'ml zeitlinger', paste0('cd ', getwd()), peak_cmds.df$cmd) %>% writeLines(., 'scripts/processing/call_pooled_peaks.sh')
+```
+
+```{bash, eval = F}
+sbuild -c 12 -m 200GB --submit scripts/processing/call_pooled_peaks.sh
+```
+
+## Run IDR
+
+Using IDR (v2.0.3), generate reproducible peaks. Here, I simply made a conda environment with IDR and its dependencies installed. See README for more information.
+
+```{r}
+idr_cmds.vec<-samples.df %>% dplyr::filter(!grepl('mnase', sample_group)) %>% .$sample_group %>% unique() %>% 
+  grep('Input', ., invert = T, value = T) %>% 
+  lapply(., function(x){
+    rep_combos.df<-samples.df %>%
+      dplyr::filter(sample_group==x) %>%
+      .$sample_rep %>%
+      tidyr::crossing(var1 = ., var2 = .) %>%
+      dplyr::filter(!(var1>=var2)) %>%
+      dplyr::mutate(var1 = ifelse(grepl('published_GSE69796', x), paste0('rep', var1), var1),
+                    var2 = ifelse(grepl('published_GSE69796', x), paste0('rep', var2), var2)) %>% 
+      dplyr::mutate(cmd = paste0('~/anaconda3/envs/idr/bin/idr --peak-list macs2/', x, '_peaks.narrowPeak --samples ../1_processing/peaks/', x, '_', var1, 
+                                 '_peaks.narrowPeak ../1_processing/peaks/', x, '_', var2, 
+                                 '_peaks.narrowPeak --idr-threshold 0.05 --input-file-type narrowPeak --output-file idr/', 
+                                 x, '_', var1, '_vs_', var2, '_idr.txt')) %>% .$cmd
+  }) %>% unlist()
+
+c('#!/bin/bash', 'source ~/.bashrc; conda deactivate; conda activate idr', paste0('cd ', getwd()), idr_cmds.vec) %>% 
+  writeLines(., 'scripts/processing/run_idr_across_peaks.sh')
+```
+
+Run IDR across these pair-wise values.
+
+```{bash, eval = F}
+sbuild -c 1 -m 50GB --submit scripts/processing/run_idr_across_peaks.sh
+```
+
+# Generate pooled coverage data
+
+For each coverage set assign model organism information, pool, normalize, and export formatted replicate and processed coverage for downstream analysis.
+
+```{r}
+all_samples<-samples.df$sample_group %>% unique()
+# selected_samples<-samples.df$sample_group %>% unique() %>% grep('atac|nexus', ., value = T)
+```
+
+## Define helper functions
+
+Some parameters and helper functions are below to extract all tracks of interest if we eventually add ChIP-seq data.
+
+```{r}
+sliding_window_size <- 101
+minimum_log2fc_value<--2
+single_value_rlelist <- function(value, lengths) {
+  RleList(lapply(lengths, function(i) Rle(rep(value, times=i)))) #May return an error if sample is too large
+}
+```
+
+## ChIP-nexus data
+
+```{r, eval = F}
+filler<-lapply(all_samples %>% grep('nexus', ., value = T), function(x){
+  message(x)
+  #Format and export positive and negative strand coverage
+  pos.paths<-Sys.glob(paste0('../1_processing/bw/', x, '_[0-9]_positive.bw'))
+  neg.paths<-Sys.glob(paste0('../1_processing/bw/', x, '_[0-9]_negative.bw'))
+  
+  pos_combined.list<-lapply(pos.paths, function(y){
+    bw<-rtracklayer::import(y)
+    bw$score<-abs(bw$score)
+    seqlevels(bw)<-seqlevels(bsgenome)
+    seqinfo(bw)<-seqinfo(bsgenome)
+    rtracklayer::export(bw, paste0('bw/', basename(y)))
+    cov<-coverage(bw, weight = bw$score)
+    return(cov)
+  })   
+  pos_combined.bw<-Reduce(f = "+", x = pos_combined.list)
+  rtracklayer::export(pos_combined.bw, paste0('bw/', x, '_combined_positive.bw'), format = "BigWig")
+  
+  neg_combined.list<-lapply(neg.paths, function(y){
+    bw<-rtracklayer::import(y)
+    bw$score<-abs(bw$score)
+    seqlevels(bw)<-seqlevels(bsgenome)
+    seqinfo(bw)<-seqinfo(bsgenome)
+    rtracklayer::export(bw, paste0('bw/', basename(y)))
+    cov<-coverage(bw, weight = bw$score)
+    return(cov)
+  })   
+  neg_combined.bw<-Reduce(f = "+", x = neg_combined.list)
+  rtracklayer::export(neg_combined.bw, paste0('bw/', x, '_combined_negative.bw'), format = "BigWig")
+  
+  combined.bw<-Reduce(f = "+", x = c(pos_combined.list, neg_combined.list))
+  rtracklayer::export(combined.bw, paste0('bw/', x, '_combined_grouped.bw'), format = "BigWig")
+  
+  total_reads<-(lapply(pos_combined.bw, function(x) return(x@values %>% sum)) %>% unlist %>% sum) + 
+    (lapply(neg_combined.bw, function(x) return(x@values %>% sum)) %>% unlist %>% sum)
+  
+  pos_rpm.bw<-pos_combined.bw/total_reads*1000000
+  rtracklayer::export(pos_rpm.bw, paste0('bw/', x, '_combined_normalized_positive.bw'), format = "BigWig")
+  
+  neg_rpm.bw<-neg_combined.bw/total_reads*1000000
+  rtracklayer::export(neg_rpm.bw, paste0('bw/', x, '_combined_normalized_negative.bw'), format = "BigWig")       
+})
+```
+
+# Session Information
+
+For the purposes of reproducibility, the R/Bioconductor session information is printed below:
+
+```{r sessioninfo}
+sessionInfo()
+```
+
+
+
+
+
+
+
+
+
+
+
+

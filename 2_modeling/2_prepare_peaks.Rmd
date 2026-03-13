@@ -1,0 +1,243 @@
+---
+title: 'Region preparation'
+author: "Melanie (1028-02098-001-001)"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output:
+  html_document:
+    depth: 3
+    theme: sandstone
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+  word_document:
+    toc: yes
+header-includes:
+- \usepackage{fancyhdr}
+- \usepackage{lipsum}
+- \pagestyle{fancy}
+- \fancyfoot[CO,CE]{1028-02098-001-001}
+- \fancyfoot[LE,RO]{\thepage}
+- \fancypagestyle{plain}{\pagestyle{fancy}}
+editor_options:
+  chunk_output_type: console
+---
+
+# Introduction
+
+The goal of this .Rmd is to prepare and consolidate all peaks for deep learning training and downstream analysis. We will need to assess peak reproducibility, process reproducible peaks, and assess quality metrics of final samples and their respective regions for downstream work.
+
+# Computational Setup
+
+```{r, warning=F, message=F}
+#Standard packages
+library(rtracklayer) ; library(GenomicRanges); library(magrittr) ; library(Biostrings)
+library(ggplot2) ; library(reshape2); library(plyranges); library(Rsamtools); library(parallel)
+library(dplyr); library(data.table); library(patchwork); library(readr); library(testit)
+
+#KNITR Options
+setwd("/n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/2_modeling/")
+figure_filepath<-'figures/2_prepare_peaks'
+options(knitr.figure_dir=figure_filepath)
+
+#Lab sources
+source("/n/projects/mw2098/shared_code/rscripts/granges_common.r")
+source("/n/projects/mw2098/shared_code/rscripts/metapeak_common.r")
+source("/n/projects/mw2098/shared_code/rscripts/knitr_common.r")
+source("/n/projects/mw2098/shared_code/rscripts/caching.r")
+source("/n/projects/mw2098/shared_code/custom/metapeak_functions.R")
+
+#Specific sources
+library(BSgenome.Dmelanogaster.UCSC.dm6)
+library(TxDb.Dmelanogaster.UCSC.dm6.ensGene)
+
+#Options and configurations
+set.seed(seed = 10)
+output_seqlen<-1000
+dir.create('narrowpeak', showWarnings = F)
+dir.create('bed', showWarnings = F)
+
+#Custom variables
+bsgenome<-BSgenome.Dmelanogaster.UCSC.dm6
+txdb<-TxDb.Dmelanogaster.UCSC.dm6.ensGene
+blacklist.gr<-rtracklayer::import('/n/projects/mw2098/genomes/dm6/dm6.blacklist.bed') #obtained from (https://www.nature.com/articles/s41598-019-45839-z)
+chroms<-c('chr2L', 'chr2R', 'chr3L', 'chr3R', 'chr4', 'chrX')
+```
+
+# Import blacklisted regions
+
+# Define peaks
+
+```{r}
+# system('wc -l idr/*')
+```
+
+```{r}
+peaks.list<-list(
+
+  S2_AntHOX6a_PBX_Flag_nexus = 'idr/S2_AntHOX6a_PBX_Flag_nexus_1_vs_2_idr.txt',
+  S2_AntHOX6a_PBX_HA_nexus = 'idr/S2_AntHOX6a_PBX_HA_nexus_1_vs_2_idr.txt',
+  
+  S2_AntHOX1a_PBX_Flag_nexus = 'idr/S2_AntHOX1a_PBX_Flag_nexus_1_vs_2_idr.txt',
+  S2_AntHOX1a_PBX_HA_nexus = 'idr/S2_AntHOX1a_PBX_HA_nexus_1_vs_2_idr.txt',
+
+  S2_Dfd_Hth_HA_nexus = 'idr/S2_Dfd_Hth_HA_nexus_1_vs_2_idr.txt',
+  S2_Dfd_Hth_antiExd_nexus = '../1_processing/peaks/S2_Dfd_Hth_anti_EXD_nexus_1_peaks.narrowPeak' #no extra replicate
+
+)
+
+```
+
+# Filter .narrowpeak that you will be using
+
+Here, we will be:
+
++ removing peaks on chromosome boundaries
++ removing peaks with underlying sequences containing Ns
++ removing peaks from chrY and chrM
++ converting to .narrowPeak format while centering the coordinates around the 'summit' column (col 9).
+
+```{r}
+peaks.gr.list<-lapply(names(peaks.list), function(x){
+  message(x)
+  if(grepl('.txt', peaks.list[[x]])){
+    df<-readr::read_tsv(peaks.list[[x]], col_names = c('chrom','start','end','name','score','strand',
+                                                       'signalValue', 'pValue', 'qValue', 'peak',
+                                                       'localIDR', 'globalIDR',
+                                                       'rep1start','rep1end','rep1signal','rep1summit',
+                                                       'rep2start','rep2end','rep2signal','rep2summit'))
+  } else{
+    df<-readr::read_tsv(peaks.list[[x]], col_names = c('chrom','start','end','name','score','strand',
+                                                       'signalValue', 'pValue', 'qValue', 'peak'))
+  }
+  
+  gr<-df %>%
+    makeGRangesFromDataFrame(keep.extra.columns = T, starts.in.df.are.0based = T) %>%
+    plyranges::filter(!overlapsAny(., blacklist.gr, ignore.strand = T)) %>% #remove blacklisted regions
+    check_chromosome_boundaries(., 10000, bsgenome) %>%
+    plyranges::select(-seqlength_filler, -end_distance, -start_distance) %>%
+    keepStandardChromosomes(x = ., pruning.mode = 'coarse') %>%
+    plyranges::filter(!(seqnames %in% c('chrY', 'chrM'))) %>%
+    
+    plyranges::mutate(start = start + peak) %>%
+    GenomicRanges::resize(., width = 1, fix = 'start') %>%
+    GenomicRanges::resize(., width = output_seqlen, fix = 'center') %>%
+    
+    plyranges::mutate(peak = floor(output_seqlen/2),  #convert to narrowpeak, broadpeak doesn't have the summit feature
+                      seq = getSeq(bsgenome, ., as.character=T)) %>%  
+    plyranges::arrange(desc(pValue)) %>% 
+    plyranges::filter(!grepl('N', seq)) %>% #Filter out all regions with N's in them
+    plyranges::select(-seq)
+  
+  #Write GRanges
+  plyranges::write_narrowpeaks(x = gr, file = paste0('narrowpeak/', tolower(x), '.narrowPeak'))
+  rtracklayer::export(object = gr, con = paste0('narrowpeak/', tolower(x), '.bed'))
+  return(gr)
+})
+names(peaks.gr.list)<-names(peaks.list)
+```
+
+# Quantify overlaps between peaks
+
+```{r}
+#First, mark whether peak set was reproducible
+reprod.df<-data.frame(
+  from_idr = lapply(peaks.list, function(x) grepl('.txt', x)) %>% unlist(),
+  experiment = names(peaks.list)
+)
+rownames(reprod.df)<-NULL
+
+#Next, do cross comparisons
+comparisons.df<-reprod.df$experiment %>%
+  tidyr::crossing(e1 = ., e2 = .) %>%
+  dplyr::filter(!(e1>=e2))
+
+comparisons_w_values.df<-cbind(comparisons.df,
+                               lapply(1:nrow(comparisons.df), function(x){
+                                 e1<-peaks.gr.list[[comparisons.df$e1[x]]]
+                                 e2<-peaks.gr.list[[comparisons.df$e2[x]]]
+                                 
+                                 data.frame(e1_n = length(e1),
+                                            e2_n = length(e2),
+                                            e1_ov_e2 = sum(overlapsAny(e1, e2, ignore.strand = T)),
+                                            e2_ov_e1 = sum(overlapsAny(e2, e1, ignore.strand = T)))
+                               }) %>% rbindlist()
+) %>% dplyr::mutate(e1_ov_rate = round(e1_ov_e2/e1_n, 2), e2_ov_rate = round(e2_ov_e1/e2_n, 2)) %>%
+  dplyr::left_join(reprod.df %>% dplyr::rename(e1 = experiment, e1_from_idr = from_idr)) %>%
+  dplyr::left_join(reprod.df %>% dplyr::rename(e2 = experiment, e2_from_idr = from_idr)) %>%
+  dplyr::mutate(idr_comparison_state = ifelse((e1_from_idr) & (e2_from_idr), 'reproducibe', 'non-reproducible')) %>%
+  dplyr::filter(idr_comparison_state != 'non-reproducible')
+```
+
+Visualize overlap rates.
+
+```{r}
+overall.plot<-ggplot(comparisons_w_values.df, aes(x = e1, y = e2, fill = e1_ov_e2))+
+  geom_tile(linewidth = 1, color = 'black')+
+  scale_x_discrete(expand = c(0,0)) + scale_y_discrete(expand = c(0,0))+
+  ggtitle('Overall peak overlaps')+
+  scale_fill_gradientn(colours = viridis(5))+ theme_classic() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+rate_e1.plot<-ggplot(comparisons_w_values.df, aes(x = e1, y = e2, fill = e1_ov_rate))+
+  geom_tile(linewidth = 1, color = 'black')+
+  scale_x_discrete(expand = c(0,0)) + scale_y_discrete(expand = c(0,0))+
+  ggtitle('Overlap rates of x-axis')+
+  scale_fill_gradient(high = 'navy', low = 'white', limits = c(0, 1))+ theme_classic() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+rate_e2.plot<-ggplot(comparisons_w_values.df, aes(x = e1, y = e2, fill = e2_ov_rate))+
+  geom_tile(linewidth = 1, color = 'black')+
+  scale_x_discrete(expand = c(0,0)) + scale_y_discrete(expand = c(0,0))+
+  ggtitle('Overlap rates of y-axis')+
+  scale_fill_gradient(high = 'darkred', low = 'white', limits = c(0, 1))+ theme_classic() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+plot<-overall.plot + rate_e1.plot + rate_e2.plot + plot_layout(nrow = 1)
+ggsave(paste0(figure_filepath, '/reproducible_peak_overlap_rates.png'), height = 6, width = 20)
+ggsave(paste0(figure_filepath, '/reproducible_peak_overlap_rates.pdf'), height = 6, width = 20)
+```
+
+# Merge all peaks
+
+In both reproducible and non-reproducible formats, merge all peaks for model training.
+
+```{r}
+reproducible.gr<-lapply(reprod.df %>% dplyr::filter(from_idr) %>% .$experiment, function(x) peaks.gr.list[[x]]) %>% 
+  as('GRangesList') %>% unlist() %>% 
+  GenomicRanges::reduce(., ignore.strand = T)
+
+all.gr<-peaks.gr.list %>% 
+  as('GRangesList') %>% unlist() %>% 
+  GenomicRanges::reduce(., ignore.strand = T)
+
+#Check widths for validity
+summary(width(reproducible.gr))
+summary(width(all.gr))
+```
+
+We can see here that the non-reproducible peaks essentially cover the entire genome and are not reliable. Thus, we will use the reproducible peaks merged together. To consider the entire breadth of the merge, we will tile the merged set. 
+
+```{r}
+final.gr<-plyranges::tile_ranges(reproducible.gr, output_seqlen) %>% 
+  plyranges::filter(!overlapsAny(., blacklist.gr))
+print(length(final.gr))
+rtracklayer::export(final.gr, 'bed/all_reproducible_peaks_tiled_expanded.bed')
+```
+
+# Session Information
+
+For the purposes of reproducibility, the R/Bioconductor session information is printed below:
+
+```{r sessioninfo}
+sessionInfo()
+```
+
+
+
+
+
+
+
+
+
+
+
+
