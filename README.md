@@ -117,9 +117,6 @@ In brief, the versions of key packages are as follows for this environment:
 
 Upon processing and storage in `code/2_modeling`, data was then modeled and analyzed. Analysis was conducted in both Python and R. For Python, analysis environment is the same as the modeling environment described above (`bpreveal_510`). For R, `sessionInfo()` is reported with relevant packages and versions at the bottom of each rendered markdown file. Markdown files are numbered in the order by which they were run. Raw figures can be found here as well as code and associated scripts to run analysis.
 
-
-# NOTE: Additional HOX TFs reported
-
-In this initial work, we incorporated data involving Cnidarian AntHOX1a and Drosophila Dfd HOX TF experiments. While not in the initial submission, we decided to include these analysis/modeling for the sake of comprehensive reporting, though the raw data is not available in GEO. Please contact the corresponding author for more information regarding these experiments.
+We wish to note that in this initial work, there are code references to Cnidarian AntHOX1a and Drosophila Dfd HOX TF experiments. Dfd and AntHOX1a were included to improve training and comparability for the establishment of candidate regions by which we could train AntHOX6a ChIP-nexus experiments using the BPNet workflow. However, all analysis and biological conclusions in this work are for the AntHOX6a data. 
 
 
