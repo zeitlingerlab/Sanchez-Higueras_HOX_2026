@@ -11,9 +11,9 @@
 
 <meta name="author" content="Melanie (1028-02098-001-001)" />
 
-<meta name="date" content="2026-07-31" />
+<meta name="date" content="2026-06-12" />
 
-<title>Data preparation</title>
+<title>Check AntHOX1a-Hth binding</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -1491,18 +1491,18 @@ border-radius: 0px;
 
 
 
-<h1 class="title toc-ignore">Data preparation</h1>
+<h1 class="title toc-ignore">Check AntHOX1a-Hth binding</h1>
 <h4 class="author">Melanie (1028-02098-001-001)</h4>
-<h4 class="date">July 31, 2026</h4>
+<h4 class="date">June 12, 2026</h4>
 
 </div>
 
 
 <div id="introduction" class="section level1">
 <h1>Introduction</h1>
-<p>The goal of this .Rmd is to prepare all aligned samples and published
-data for deep learning training and downstream analysis. Further, we
-will document alignment statistics of every ChIP-nexus experiment.</p>
+<p>Given different motifs mapped by our models, do we also see binding
+across either the heterodimer or the monomer for AntHOX1a-Hth
+experiments?</p>
 </div>
 <div id="computational-setup" class="section level1">
 <h1>Computational Setup</h1>
@@ -1513,183 +1513,470 @@ library(dplyr); library(data.table); library(patchwork); library(readr); library
 
 #KNITR Options
 setwd(&quot;/n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/2_modeling/&quot;)
-figure_filepath&lt;-&#39;figures/1_prepare_data&#39;
+figure_filepath&lt;-&#39;figures/6_check_antihox1a_hth&#39;
 options(knitr.figure_dir=figure_filepath)
 
 #Lab sources
-source(&quot;/n/projects/mw2098/shared_code/rscripts/granges_common.r&quot;)
-source(&quot;/n/projects/mw2098/shared_code/rscripts/metapeak_common.r&quot;)
-source(&quot;/n/projects/mw2098/shared_code/rscripts/knitr_common.r&quot;)
-source(&quot;/n/projects/mw2098/shared_code/rscripts/caching.r&quot;)
-source(&quot;/n/projects/mw2098/shared_code/custom/metapeak_functions.R&quot;)
+source(&quot;scripts/r/granges_common.r&quot;)
+source(&quot;scripts/r/metapeak_common.r&quot;)
+source(&quot;scripts/r/knitr_common.r&quot;)
+source(&quot;scripts/r/caching.r&quot;)
+source(&quot;scripts/r/metapeak_functions.r&quot;)
+source(&quot;scripts/r/motif_functions.r&quot;)
 
 #Specific sources
 library(BSgenome.Dmelanogaster.UCSC.dm6)
 library(TxDb.Dmelanogaster.UCSC.dm6.ensGene)
+library(ggseqlogo)
 
-#Options and configurations
-dir.create(&#39;bw&#39;, showWarnings = F)
-dir.create(&#39;idr&#39;, showWarnings = F)
-dir.create(&#39;bam&#39;, showWarnings = F)
-dir.create(&#39;macs2&#39;, showWarnings = F)
-dir.create(&#39;inps/bed/&#39;, recursive = T, showWarnings = F)
-dir.create(&#39;inps/output/&#39;, recursive = T, showWarnings = F)
-dir.create(&#39;scripts/processing&#39;, showWarnings = F, recursive = T)
-
-#Custom variables
+#Pre-existing variables
+threads &lt;- 5
+dir.create(&#39;bed/mapped_motifs&#39;, recursive = T, showWarnings = F)
+dir.create(&#39;tsv/mapped_motifs&#39;, recursive = T, showWarnings = F)
+dir.create(&#39;rdata/mapped_motifs&#39;, recursive = T, showWarnings = F)
 bsgenome&lt;-BSgenome.Dmelanogaster.UCSC.dm6
-samples.xlsx&lt;-&#39;../0_setup/1_define_samples.xlsx&#39;
+txdb&lt;-TxDb.Dmelanogaster.UCSC.dm6.ensGene
 
-dir.create(&#39;tsv/quality&#39;, showWarnings = F, recursive = T)</code></pre>
+#variable/model information
+output_length&lt;-1000
+bg_freqs&lt;-c(.27, .21, .21, .27)</code></pre>
 </div>
-<div id="import-sample-names" class="section level1">
-<h1>Import sample names</h1>
-<pre class="r"><code>samples.df&lt;-readxl::read_xlsx(samples.xlsx) %&gt;% as.data.frame %&gt;%
-  dplyr::mutate(sample_group = sub(&quot;_[^_]+$&quot;, &quot;&quot;, sample_name),
-                sample_rep = stringr::str_extract(pattern = &quot;_[^_]+$&quot;, gsub(&#39;rep&#39;, &#39;&#39;, sample_name)) %&gt;% 
-                  gsub(&#39;_&#39;, &#39;&#39;, .) %&gt;% 
-                  as.integer())</code></pre>
-</div>
-<div id="generate-reproducible-set-of-peaks" class="section level1">
-<h1>Generate reproducible set of peaks</h1>
-<div id="pool-sample-reads-for-peak-calling" class="section level2">
-<h2>Pool sample reads for peak calling</h2>
-<p>In order to create an oracle peak set for reproducible peak calling,
-pool samples. This is done here, for the sake of simplicity.</p>
-<pre class="r"><code>pool_cmds.vec&lt;-samples.df %&gt;%
-  dplyr::group_by(sample_group) %&gt;%
-  dplyr::summarize(freq = dplyr::n(),
-                   cmd = paste0(&#39;samtools merge --threads 12 bam/&#39;, sample_group, &#39;_combined.bam &#39;, 
-                                paste0(&#39;../1_processing/bam/&#39;, sample_name, &#39;.bam&#39;, collapse = &#39; &#39;))) %&gt;%
-  dplyr::filter(freq&gt;1)
-c(&#39;#!/bin/bash&#39;, &#39;ml zeitlinger&#39;, paste0(&#39;cd &#39;, getwd()), pool_cmds.vec$cmd %&gt;% unique) %&gt;% writeLines(., &#39;scripts/processing/pool_aligned_replicates.sh&#39;)</code></pre>
-<pre class="bash"><code>cd /n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/2_modeling
-ml simr
-sbuild -c 12 -m 200GB --submit scripts/processing/pool_aligned_replicates.sh</code></pre>
-</div>
-<div id="generate-pooled-peaks" class="section level2">
-<h2>Generate pooled peaks</h2>
-<pre class="r"><code>peak_cmds.df&lt;-samples.df %&gt;%
-  dplyr::filter(!grepl(&#39;mnase&#39;, sample_group)) %&gt;%
-  dplyr::group_by(sample_group) %&gt;%
-  dplyr::summarize(freq = dplyr::n(),,
-                   cmd = ifelse(unique(experiment)==&#39;ATAC-seq&#39;,
-                                paste0(&#39;macs2 callpeak -f BAMPE -t bam/&#39;, sample_group, &#39;_combined.bam --outdir macs2 -n &#39;, sample_group),
-                                paste0(&#39;macs2 callpeak -f BAM --keep-dup all --nomodel --shift -75 --extsize 150 -t bam/&#39;, sample_group, &#39;_combined.bam --outdir macs2 -n &#39;, sample_group))) %&gt;%
-  dplyr::filter(freq&gt;1)
+<div id="import-motifs" class="section level1">
+<h1>Import motifs</h1>
+<pre class="r"><code># #If starting from .bed files
+# motifs.list.gr&lt;-&#39;bed/mapped_motifs/all_instances_curated_s2_*.bed&#39; %&gt;%
+#   Sys.glob(.) %&gt;%
+#   lapply(., function(x){
+#     rtracklayer::import(x)
+#   })
+# names(motifs.list.gr)&lt;-basename(Sys.glob(&#39;bed/mapped_motifs/all_instances_curated_s2_*.bed&#39;)) %&gt;%
+#   gsub(&#39;all_instances_curated_s2_&#39;, &#39;&#39;, .) %&gt;%
+#   gsub(&#39;_nexus_fold1_pbx_counts_0based.bed&#39;, &#39;&#39;, .) %&gt;%
+#   gsub(&#39;_nexus_fold1_dfd_counts_0based.bed&#39;, &#39;&#39;, .)
 
-c(&#39;#!/bin/bash&#39;, &#39;ml zeitlinger&#39;, paste0(&#39;cd &#39;, getwd()), peak_cmds.df$cmd) %&gt;% writeLines(., &#39;scripts/processing/call_pooled_peaks.sh&#39;)</code></pre>
-<pre class="bash"><code>sbuild -c 12 -m 200GB --submit scripts/processing/call_pooled_peaks.sh</code></pre>
-</div>
-<div id="run-idr" class="section level2">
-<h2>Run IDR</h2>
-<p>Using IDR (v2.0.3), generate reproducible peaks. Here, I simply made
-a conda environment with IDR and its dependencies installed. See README
-for more information.</p>
-<pre class="r"><code>idr_cmds.vec&lt;-samples.df %&gt;% dplyr::filter(!grepl(&#39;mnase&#39;, sample_group)) %&gt;% .$sample_group %&gt;% unique() %&gt;% 
-  grep(&#39;Input&#39;, ., invert = T, value = T) %&gt;% 
-  lapply(., function(x){
-    rep_combos.df&lt;-samples.df %&gt;%
-      dplyr::filter(sample_group==x) %&gt;%
-      .$sample_rep %&gt;%
-      tidyr::crossing(var1 = ., var2 = .) %&gt;%
-      dplyr::filter(!(var1&gt;=var2)) %&gt;%
-      dplyr::mutate(var1 = ifelse(grepl(&#39;published_GSE69796&#39;, x), paste0(&#39;rep&#39;, var1), var1),
-                    var2 = ifelse(grepl(&#39;published_GSE69796&#39;, x), paste0(&#39;rep&#39;, var2), var2)) %&gt;% 
-      dplyr::mutate(cmd = paste0(&#39;~/anaconda3/envs/idr/bin/idr --peak-list macs2/&#39;, x, &#39;_peaks.narrowPeak --samples ../1_processing/peaks/&#39;, x, &#39;_&#39;, var1, 
-                                 &#39;_peaks.narrowPeak ../1_processing/peaks/&#39;, x, &#39;_&#39;, var2, 
-                                 &#39;_peaks.narrowPeak --idr-threshold 0.05 --input-file-type narrowPeak --output-file idr/&#39;, 
-                                 x, &#39;_&#39;, var1, &#39;_vs_&#39;, var2, &#39;_idr.txt&#39;)) %&gt;% .$cmd
-  }) %&gt;% unlist()
+#If starting from .tsv riles
+all_motifs.gr&lt;-readr::read_tsv(&#39;tsv/mapped_motifs/all_instances_curated_1based.tsv.gz&#39;) %&gt;%
+  makeGRangesFromDataFrame(keep.extra.columns = T)
 
-c(&#39;#!/bin/bash&#39;, &#39;source ~/.bashrc; conda deactivate; conda activate idr&#39;, paste0(&#39;cd &#39;, getwd()), idr_cmds.vec) %&gt;% 
-  writeLines(., &#39;scripts/processing/run_idr_across_peaks.sh&#39;)</code></pre>
-<p>Run IDR across these pair-wise values.</p>
-<pre class="bash"><code>sbuild -c 1 -m 50GB --submit scripts/processing/run_idr_across_peaks.sh</code></pre>
+motifs.list.gr&lt;-lapply(all_motifs.gr$model %&gt;% unique, function(x){
+    all_motifs.gr %&gt;% plyranges::filter(model == x)
+  })
+names(motifs.list.gr)&lt;-all_motifs.gr$model %&gt;% unique %&gt;%
+  gsub(&#39;all_instances_curated_s2_&#39;, &#39;&#39;, .) %&gt;%
+  gsub(&#39;_nexus_fold1_pbx_counts&#39;, &#39;&#39;, .) %&gt;%
+  gsub(&#39;_nexus_fold1_dfd_counts&#39;, &#39;&#39;, .)
+  
+logos.plot&lt;-lapply(motifs.list.gr, function(x){
+  getSeq(bsgenome, x, as.character = T)
+}) %&gt;% ggseqlogo(.) + facet_wrap(~seq_group, ncol = 1)</code></pre>
 </div>
+<div id="allocate-coverage-and-settings" class="section level1">
+<h1>Allocate coverage and settings</h1>
+<pre class="r"><code>nexus_bw.list&lt;-list(
+  
+  #Experiment corresponding to motifs that worked
+  
+  S2_AntHOX6a_PBX_Flag = list(pos = &#39;bw/S2_AntHOX6a_PBX_Flag_nexus_combined_positive.bw&#39;,
+                              neg = &#39;bw/S2_AntHOX6a_PBX_Flag_nexus_combined_negative.bw&#39;) %&gt;%
+    mclapply(., function(x) {rtracklayer::import.bw(x, as=&quot;RleList&quot;)}, mc.cores = 1),
+  
+  S2_AntHOX6a_PBX_HA = list(pos = &#39;bw/S2_AntHOX6a_PBX_HA_nexus_combined_positive.bw&#39;,
+                            neg = &#39;bw/S2_AntHOX6a_PBX_HA_nexus_combined_negative.bw&#39;) %&gt;%
+    mclapply(., function(x) {rtracklayer::import.bw(x, as=&quot;RleList&quot;)}, mc.cores = 1),
+  
+  S2_AntHOX1a_PBX_Flag = list(pos = &#39;bw/S2_AntHOX1a_PBX_Flag_nexus_combined_positive.bw&#39;,
+                              neg = &#39;bw/S2_AntHOX1a_PBX_Flag_nexus_combined_negative.bw&#39;) %&gt;%
+    mclapply(., function(x) {rtracklayer::import.bw(x, as=&quot;RleList&quot;)}, mc.cores = 1),
+  
+  S2_AntHOX1a_PBX_HA = list(pos = &#39;bw/S2_AntHOX1a_PBX_HA_nexus_combined_positive.bw&#39;,
+                            neg = &#39;bw/S2_AntHOX1a_PBX_HA_nexus_combined_negative.bw&#39;) %&gt;%
+    mclapply(., function(x) {rtracklayer::import.bw(x, as=&quot;RleList&quot;)}, mc.cores = 1),
+  
+  S2_Dfd_Hth_HA = list(pos = &#39;bw/S2_Dfd_Hth_HA_nexus_combined_positive.bw&#39;,
+                       neg = &#39;bw/S2_Dfd_Hth_HA_nexus_combined_negative.bw&#39;) %&gt;%
+    mclapply(., function(x) {rtracklayer::import.bw(x, as=&quot;RleList&quot;)}, mc.cores = 1),
+  
+  S2_Dfd_Hth_EXD = list(pos = &#39;bw/S2_Dfd_Hth_anti_EXD_nexus_combined_positive.bw&#39;,
+                        neg = &#39;bw/S2_Dfd_Hth_anti_EXD_nexus_combined_negative.bw&#39;) %&gt;%
+    mclapply(., function(x) {rtracklayer::import.bw(x, as=&quot;RleList&quot;)}, mc.cores = 1),
+  
+  #Experiments to test binding across
+  S2_AntHOX1a_Hth_HA = list(pos = &#39;../../20250717_hox/2_analysis/bw/S2_AntHOX1a_Hth_HA_nexus_combined_positive.bw&#39;,
+                              neg = &#39;../../20250717_hox/2_analysis/bw/S2_AntHOX1a_Hth_HA_nexus_combined_negative.bw&#39;) %&gt;%
+    mclapply(., function(x) {rtracklayer::import.bw(x, as=&quot;RleList&quot;)}, mc.cores = 1),
+  S2_AntHOX1_Hth_HA = list(pos = &#39;../../20250717_hox/2_analysis/bw/S2_AntHOX1_Hth_HA_nexus_combined_positive.bw&#39;,
+                             neg = &#39;../../20250717_hox/2_analysis/bw/S2_AntHOX1_Hth_HA_nexus_combined_negative.bw&#39;) %&gt;%
+    mclapply(., function(x) {rtracklayer::import.bw(x, as=&quot;RleList&quot;)}, mc.cores = 1)  
+  )
+
+#Define how many motifs to consider
+top_n = 250</code></pre>
 </div>
-<div id="generate-pooled-coverage-data" class="section level1">
-<h1>Generate pooled coverage data</h1>
-<p>For each coverage set assign model organism information, pool,
-normalize, and export formatted replicate and processed coverage for
-downstream analysis.</p>
-<pre class="r"><code>all_samples&lt;-samples.df$sample_group %&gt;% unique()
-# selected_samples&lt;-samples.df$sample_group %&gt;% unique() %&gt;% grep(&#39;atac|nexus&#39;, ., value = T)</code></pre>
-<div id="define-helper-functions" class="section level2">
-<h2>Define helper functions</h2>
-<p>Some parameters and helper functions are below to extract all tracks
-of interest if we eventually add ChIP-seq data.</p>
-<pre class="r"><code>sliding_window_size &lt;- 101
-minimum_log2fc_value&lt;--2
-single_value_rlelist &lt;- function(value, lengths) {
-  RleList(lapply(lengths, function(i) Rle(rep(value, times=i)))) #May return an error if sample is too large
-}</code></pre>
-</div>
-<div id="chip-nexus-data" class="section level2">
-<h2>ChIP-nexus data</h2>
-<pre class="r"><code>filler&lt;-lapply(all_samples %&gt;% grep(&#39;nexus&#39;, ., value = T), function(x){
+<div id="visualize-chip-nexus-coverage" class="section level1">
+<h1>Visualize ChIP-nexus coverage</h1>
+<p>Given the set of motifs, what do ChIP-nexus heatmaps look like across
+the top motifs per logo?</p>
+<p>We define top motifs here as most reads in region.</p>
+<div id="anthox1a-hth" class="section level2">
+<h2>ANTHOX1a-Hth</h2>
+<pre class="r"><code>hm_plot_all.list&lt;-lapply(names(motifs.list.gr), function(x){
   message(x)
-  #Format and export positive and negative strand coverage
-  pos.paths&lt;-Sys.glob(paste0(&#39;../1_processing/bw/&#39;, x, &#39;_[0-9]_positive.bw&#39;))
-  neg.paths&lt;-Sys.glob(paste0(&#39;../1_processing/bw/&#39;, x, &#39;_[0-9]_negative.bw&#39;))
+  matched_experiment&lt;-names(nexus_bw.list)[grepl(x, names(nexus_bw.list), ignore.case = T)]
   
-  pos_combined.list&lt;-lapply(pos.paths, function(y){
-    bw&lt;-rtracklayer::import(y)
-    bw$score&lt;-abs(bw$score)
-    seqlevels(bw)&lt;-seqlevels(bsgenome)
-    seqinfo(bw)&lt;-seqinfo(bsgenome)
-    rtracklayer::export(bw, paste0(&#39;bw/&#39;, basename(y)))
-    cov&lt;-coverage(bw, weight = bw$score)
-    return(cov)
-  })   
-  pos_combined.bw&lt;-Reduce(f = &quot;+&quot;, x = pos_combined.list)
-  rtracklayer::export(pos_combined.bw, paste0(&#39;bw/&#39;, x, &#39;_combined_positive.bw&#39;), format = &quot;BigWig&quot;)
+  # #If ordering by total reads
+  # m.gr&lt;-motifs.list.gr[[x]] %&gt;%  
+  #   plyranges::mutate(total_reads = regionSums(GenomicRanges::resize(., 100, &#39;center&#39;), nexus_bw.list[[matched_experiment]]$pos) + abs(regionSums(GenomicRanges::resize(., 100, &#39;center&#39;), nexus_bw.list[[matched_experiment]]$neg))) %&gt;%
+  #   plyranges::arrange(desc(total_reads)) %&gt;% 
+  #   head(n=top_n) %&gt;% 
+  #   plyranges::arrange(total_reads) %&gt;%
+  #   plyranges::mutate(seq = getSeq(bsgenome, ., as.character = T))
   
-  neg_combined.list&lt;-lapply(neg.paths, function(y){
-    bw&lt;-rtracklayer::import(y)
-    bw$score&lt;-abs(bw$score)
-    seqlevels(bw)&lt;-seqlevels(bsgenome)
-    seqinfo(bw)&lt;-seqinfo(bsgenome)
-    rtracklayer::export(bw, paste0(&#39;bw/&#39;, basename(y)))
-    cov&lt;-coverage(bw, weight = bw$score)
-    return(cov)
-  })   
-  neg_combined.bw&lt;-Reduce(f = &quot;+&quot;, x = neg_combined.list)
-  rtracklayer::export(neg_combined.bw, paste0(&#39;bw/&#39;, x, &#39;_combined_negative.bw&#39;), format = &quot;BigWig&quot;)
+  #If ordering by cwm match scores
+  m.gr&lt;-motifs.list.gr[[x]] %&gt;%  
+    plyranges::arrange(desc(contrib_match)) %&gt;% 
+    head(n=top_n) %&gt;% 
+    plyranges::arrange(contrib_match) %&gt;%
+    plyranges::mutate(seq = getSeq(bsgenome, ., as.character = T))
+    
+  print(m.gr$seq %&gt;% table %&gt;% sort(decreasing = T))
   
-  combined.bw&lt;-Reduce(f = &quot;+&quot;, x = c(pos_combined.list, neg_combined.list))
-  rtracklayer::export(combined.bw, paste0(&#39;bw/&#39;, x, &#39;_combined_grouped.bw&#39;), format = &quot;BigWig&quot;)
+  plots_across_motif.list&lt;-lapply(c(matched_experiment, &#39;S2_AntHOX1a_Hth_HA&#39;), function(y){
+    nexus.df&lt;-plot_nexus_heatmap(regions.gr = GenomicRanges::resize(m.gr, width = 1, fix = &#39;center&#39;), 
+                                   sample = nexus_bw.list[[y]], upstream = 150, downstream = 151, 
+                                   title = y, order = &#39;asis&#39;, removal_threshold = .8, normalize_threshold = .999,
+                                   return_only_df = T) #.8, .99
+    
+    nexus.plot&lt;-ggplot()+
+      geom_tile(data=nexus.df %&gt;% dplyr::filter(strand == &#39;pos&#39;), aes(x=position, y=region, fill=signal))+
+      geom_tile(data=nexus.df %&gt;% dplyr::filter(strand == &#39;neg&#39;), aes(x=position, y=region, fill=-signal), alpha=.5)+
+      ggtitle(paste0(&#39;Motif: &#39;, m.gr$name %&gt;% unique, &#39;\nfrom model\n&#39;, x), subtitle = paste0(&#39;ChIP: &#39;, y))+
+      scale_x_continuous(&quot;Position (bp)&quot;, expand = c(0, 0))+
+      scale_y_continuous(&quot;Regions&quot;, expand = c(0, 0))+
+      scale_fill_gradientn(colors = c(&#39;#08306b&#39;, &#39;#08519c&#39; , &#39;#2171b5&#39;, &#39;#4292c6&#39;, &#39;#6baed6&#39;,
+                                      &#39;#9ecae1&#39;, &#39;#c6dbef&#39;,&#39;#deebf7&#39;, &#39;#f7fbff&#39;, &quot;white&quot;, &#39;#fff5f0&#39;,
+                                      &#39;#fee0d2&#39;,&#39;#fcbba1&#39;,&#39;#fc9272&#39;,&#39;#fb6a4a&#39;,&#39;#ef3b2c&#39;,&#39;#cb181d&#39;,&#39;#a50f15&#39;,&#39;#67000d&#39;), name = &quot;norm. signal&quot;) +
+      theme_classic()+
+      theme(text=element_text(size=14), legend.position = &quot;none&quot;, panel.grid = element_blank(), panel.border = element_blank())
+    return(nexus.plot)
+  })
   
-  total_reads&lt;-(lapply(pos_combined.bw, function(x) return(x@values %&gt;% sum)) %&gt;% unlist %&gt;% sum) + 
-    (lapply(neg_combined.bw, function(x) return(x@values %&gt;% sum)) %&gt;% unlist %&gt;% sum)
-  
-  pos_rpm.bw&lt;-pos_combined.bw/total_reads*1000000
-  rtracklayer::export(pos_rpm.bw, paste0(&#39;bw/&#39;, x, &#39;_combined_normalized_positive.bw&#39;), format = &quot;BigWig&quot;)
-  
-  neg_rpm.bw&lt;-neg_combined.bw/total_reads*1000000
-  rtracklayer::export(neg_rpm.bw, paste0(&#39;bw/&#39;, x, &#39;_combined_normalized_negative.bw&#39;), format = &quot;BigWig&quot;)       
+  hm.plot&lt;-wrap_plots(plots_across_motif.list, nrow = 1) 
+  ggsave(paste0(figure_filepath, &#39;/nexus_heatmap_across_&#39;, x, &#39;_motifs_ANTHOX1a_HTH_HA.png&#39;), hm.plot, height = 6, width = 16)
+  ggsave(paste0(figure_filepath, &#39;/nexus_heatmap_across_&#39;, x, &#39;_motifs_ANTHOX1a_HTH_HA.pdf&#39;), hm.plot, height = 6, width = 16)
+  return(hm.plot)
 })</code></pre>
+<pre><code>## .
+## ATGATTGATG TTGATTGATG CTGATTGATG GTGATTGATG ATGATTGATT TTGATGGATG TTGATTGATT 
+##         57         45         26         26         21          8          8 
+## ATGATGGATG GTGATTGATA CTGATGGATG CTGATTGATT GTGATTGATT ATGATTGATC GTGATGGATG 
+##          7          6          5          5          5          3          3 
+## ATGACTGATG ATGATCGATG ATGATGGATC CTGATCGATG GTGAGTGATG GTGATCGATG TTGATTGATC 
+##          2          2          2          2          2          2          2 
+## ATGACCGATG ATGATAGATG ATGATTGAGG ATGATTGATA CTGATAGATG CTGATTGATA GTGATCGATC 
+##          1          1          1          1          1          1          1 
+## GTGATCGATT GTGATTGATC TTGATCGATG TTGATTGATA 
+##          1          1          1          1 
+## [1] 250</code></pre>
+<pre><code>## [1] 250</code></pre>
+<pre><code>## .
+## TTGATTGATT ATGATTGATT TTGATTGATG ATGATTGATG ATGATCGATG GTGATTGATT ATGATTGATC 
+##         37         28         28         26         19         14         11 
+## CTGATTGATT ATGATCGATT ATGATTGATA GTGATTGATG TTGATCGATG TTGATCGATT CTGATTGATG 
+##          9          8          8          7          7          7          6 
+## GTGATCGATG GTGATTGATC TTGATCGATA CTGATTGATC TTGATTGATA ATGATCGATA GTGATTGATA 
+##          5          5          5          4          4          3          3 
+## TTGATTGATC GTGATCGATT TTGATCGATC 
+##          3          2          1 
+## [1] 250</code></pre>
+<pre><code>## [1] 250</code></pre>
+<pre><code>## .
+## ATGATTTATGG ATGATTGATGG GTGATTTATCT GTGATTTATGG ATGATTGATGA ATGATTTATGA 
+##          15          14          13          11          10          10 
+## TTGATTTATGA TTGATTTATGG ATGATTTATGT GTGATTTATGA ATGATTTATCA ATGATTTATTG 
+##           9           8           7           7           6           6 
+## CTGATTTATGG TTGATTTATGT ATGATTGATCA ATGATTGATGT CTGATTTATGA CTGATTTATGT 
+##           6           6           5           5           5           5 
+## GTGATTGATGA GTGATTGATGG ATGATTTATGC CTGATTGATGG GTGATTGATGT GTGATTTATCA 
+##           5           5           4           4           4           4 
+## GTGATTTATGC GTGATTTATTA TTGATTGATGG ATGATTGATCT ATGATTTATCT ATGATTTATTA 
+##           4           4           4           3           3           3 
+## ATGATTTATTT CTGATTGATCA GTGATTTATGT GTGATTTATTT TTGATTGATGA TTGATTTATCA 
+##           3           3           3           3           3           3 
+## TTGATTTATCT ATGATTGATTG CTGATTGATGA CTGATTTATCT GTGATTAATGT GTGATTGATCT 
+##           3           2           2           2           2           2 
+## GTGATTTATTG TTGATTGATCA TTGATTGATCT TTGATTTATTT ATGATTAATGA ATGATTAATGG 
+##           2           2           2           2           1           1 
+## ATGATTCATCG ATGATTGATCG ATGATTTATAG ATGATTTATAT CTGATTAATCT CTGATTGATCT 
+##           1           1           1           1           1           1 
+## CTGATTGATGT CTGATTTATCA CTGATTTATGC CTGATTTATTA CTGATTTATTG GTGATTAATGA 
+##           1           1           1           1           1           1 
+## GTGATTGATCA GTGATTTATAT 
+##           1           1 
+## [1] 250</code></pre>
+<pre><code>## [1] 250</code></pre>
+<pre><code>## .
+## ATGATTTATGGCC ATGATTTATGGCA TTGATTTATGGCA ATGATTTATGGCG TTGATTTATGGCC 
+##            29            20            12            11            10 
+## ATGATTTATGGCT TTGATTTATGGCT GTGATTTATGGCA TTGATTTATGGCG GTGATTTATGGCC 
+##             9             9             8             8             7 
+## CTGATTTATGGCC ATGATTGATGGCT ATGATTTATGGGG GTGATTTATTGCC TTGATTGATGGCC 
+##             6             5             5             5             5 
+## CTGATTTATGGCG GTGATTTATGGCG GTGATTTATGTCC ATGATTGATGGCC ATGATTTATGGGC 
+##             4             4             4             3             3 
+## ATGATTTATGGGT ATGATTTATTGCC CTGATTTATGGCT GTGATTTATTGCA ATGATTAATGGCA 
+##             3             3             3             3             2 
+## ATGATTTATGACA ATGATTTATGACC ATGATTTATGCCG ATGATTTATGGAG ATGATTTATGGAT 
+##             2             2             2             2             2 
+## ATGATTTATGGGA ATGATTTATGTCG ATGATTTATTGCA ATGATTTATTGGC GTGATTGATGGCA 
+##             2             2             2             2             2 
+## GTGATTGATGGCC GTGATTTATGACA GTGATTTATGGAT GTGATTTATGGTA AAGATTTATGGCT 
+##             2             2             2             2             1 
+## ATGATTAATGGCC ATGATTAATGGCT ATGATTGATGGCA ATGATTGATTGCC ATGATTTATAGCC 
+##             1             1             1             1             1 
+## ATGATTTATGACG ATGATTTATGACT ATGATTTATGCCA ATGATTTATGCCC ATGATTTATGCCT 
+##             1             1             1             1             1 
+## ATGATTTATGGAA ATGATTTATGGAC ATGATTTATGGTT ATGATTTATGTCC CTGATTGATGGCA 
+##             1             1             1             1             1 
+## CTGATTTATGCCA CTGATTTATGGCA CTGATTTATGGGG GTGATTTATGACC GTGATTTATGGAA 
+##             1             1             1             1             1 
+## GTGATTTATGGAC GTGATTTATGGAG GTGATTTATGGCT GTGATTTATGGGA GTGATTTATGGGG 
+##             1             1             1             1             1 
+## GTGATTTATGGTG TTGATTGATGGCT TTGATTTATGACT TTGATTTATGGAG TTGATTTATGGAT 
+##             1             1             1             1             1 
+## TTGATTTATGGGA TTGATTTATGGGC TTGATTTATGGGG TTGATTTATGGTA TTGATTTATGGTC 
+##             1             1             1             1             1 
+## TTGATTTATGGTG TTGATTTATGGTT TTGATTTATGTCC TTGATTTATTGCA TTGATTTATTGCT 
+##             1             1             1             1             1 
+## [1] 250</code></pre>
+<pre><code>## [1] 250</code></pre>
+<pre><code>## .
+## ATGATTAATGGC ATGATTAATTAC ATGATTAATGAG GTGATTAATTAA GTGATTAATTAT TTGATTAATGAA 
+##            8            7            6            6            6            6 
+## ATGATTAATGAA ATGATTAATTAT GTGATTAATTAG GTGATTGATGGC TTGATTAATTAT ATGATTAATGTC 
+##            5            5            5            5            5            4 
+## ATGATTAATTAA ATGATTAATTAG GTGATTAATCAC GTGATTAATGAA GTGATTGATGAC GTGATTGATGAG 
+##            4            4            4            4            4            4 
+## TTGATTAATTAA TTGATTAATTAC ATGATTAATAAT ATGATTAATCAC CTGATTAATCAG CTGATTAATCTG 
+##            4            4            3            3            3            3 
+## CTGATTAATGAA GTGATTAATCAA GTGATTAATGAC GTGATTAATGAG GTGATTAATGAT GTGATTAATGGC 
+##            3            3            3            3            3            3 
+## GTGATTAATTAC GTGATTAATTTG GTGATTGATGAT TTGATTAATGTG ATGATTAATAAC ATGATTAATCAA 
+##            3            3            3            3            2            2 
+## ATGATTAATCAG ATGATTAATGAT ATGATTAATGGG ATGATTAATGTG ATGATTAATTGG CTGATTAATGTG 
+##            2            2            2            2            2            2 
+## CTGATTAATTAC CTGATTAATTAT GTGATTAATAAT GTGATTAATCGC GTGATTAATGGT GTGATTAATGTA 
+##            2            2            2            2            2            2 
+## GTGATTAATTGG GTGATTGATCAT GTGATTGATGGA GTGATTGATGGG GTGATTGATGTG GTGATTGATTAG 
+##            2            2            2            2            2            2 
+## TTGATTAATAAC TTGATTAATGAC TTGATTAATGGA TTGATTAATGGC TTGATTAATGGT TTGATTAATTGC 
+##            2            2            2            2            2            2 
+## ATGATTAATAAA ATGATTAATAAG ATGATTAATCAT ATGATTAATCTG ATGATTAATGAC ATGATTAATGGA 
+##            1            1            1            1            1            1 
+## ATGATTAATGGT ATGATTAATGTT ATGATTAATTGC ATGATTAATTGT ATGATTGATCAC ATGATTGATGAA 
+##            1            1            1            1            1            1 
+## ATGATTGATGGC ATGATTGATTAC ATGATTTATGAG CTGATTAATAAT CTGATTAATCGC CTGATTAATGAG 
+##            1            1            1            1            1            1 
+## CTGATTAATGGA CTGATTAATGGG CTGATTAATTAA CTGATTAATTAG CTGATTAATTGA CTGATTAATTGC 
+##            1            1            1            1            1            1 
+## CTGATTAATTGG CTGATTGATGTA GTGATTAATCAT GTGATTAATCGA GTGATTAATGGG GTGATTAATGTG 
+##            1            1            1            1            1            1 
+## GTGATTAATGTT GTGATTAATTGC GTGATTAATTTT GTGATTGATCAC GTGATTGATCGA GTGATTGATGAA 
+##            1            1            1            1            1            1 
+## GTGATTGATGGT GTGATTGATGTC GTGATTGATGTT GTGATTGATTAC GTGATTGATTTC GTGATTTATGAG 
+##            1            1            1            1            1            1 
+## TTGATTAATAAA TTGATTAATCAA TTGATTAATCGG TTGATTAATGAG TTGATTAATGAT TTGATTAATGTT 
+##            1            1            1            1            1            1 
+## TTGATTAATTAG TTGATTAATTGT TTGATTAATTTA TTGATTGATGAC TTGATTGATGAG TTGATTGATGAT 
+##            1            1            1            1            1            1 
+## TTGATTGATGGC TTGATTGATGTC 
+##            1            1 
+## [1] 250</code></pre>
+<pre><code>## [1] 250</code></pre>
+<pre><code>## .
+## TTAATGGC TTAATGAC CTAATGGC CTAATGAC 
+##      192       30       17       11 
+## [1] 250</code></pre>
+<pre><code>## [1] 250</code></pre>
+<pre class="r"><code>hm_all.plot&lt;-logos.plot + wrap_plots(hm_plot_all.list, ncol = 1) 
+ggsave(paste0(figure_filepath, &#39;/nexus_heatmap_across_all_motifs_ANTHOX1a_HTH_HA.png&#39;), hm_all.plot, height = 24, width = 16)
+ggsave(paste0(figure_filepath, &#39;/nexus_heatmap_across_all_motifs_ANTHOX1a_HTH_HA.pdf&#39;), hm_all.plot, height = 24, width = 16)</code></pre>
 </div>
+<div id="anthox1-hth" class="section level2">
+<h2>ANTHOX1-Hth</h2>
+<pre class="r"><code>hm_plot_all.list&lt;-lapply(names(motifs.list.gr), function(x){
+  message(x)
+  matched_experiment&lt;-names(nexus_bw.list)[grepl(x, names(nexus_bw.list), ignore.case = T)]
+  
+  #If ordering by cwm match scores
+  m.gr&lt;-motifs.list.gr[[x]] %&gt;%  
+    plyranges::arrange(desc(contrib_match)) %&gt;% 
+    head(n=top_n) %&gt;% 
+    plyranges::arrange(contrib_match) %&gt;%
+    plyranges::mutate(seq = getSeq(bsgenome, ., as.character = T))
+    
+  print(m.gr$seq %&gt;% table %&gt;% sort(decreasing = T))
+  
+  plots_across_motif.list&lt;-lapply(c(matched_experiment, &#39;S2_AntHOX1_Hth_HA&#39;), function(y){
+    nexus.df&lt;-plot_nexus_heatmap(regions.gr = GenomicRanges::resize(m.gr, width = 1, fix = &#39;center&#39;), 
+                                   sample = nexus_bw.list[[y]], upstream = 150, downstream = 151, 
+                                   title = y, order = &#39;asis&#39;, removal_threshold = .8, normalize_threshold = .999,
+                                   return_only_df = T) #.8, .99
+    
+    nexus.plot&lt;-ggplot()+
+      geom_tile(data=nexus.df %&gt;% dplyr::filter(strand == &#39;pos&#39;), aes(x=position, y=region, fill=signal))+
+      geom_tile(data=nexus.df %&gt;% dplyr::filter(strand == &#39;neg&#39;), aes(x=position, y=region, fill=-signal), alpha=.5)+
+      ggtitle(paste0(&#39;Motif: &#39;, m.gr$name %&gt;% unique, &#39;\nfrom model\n&#39;, x), subtitle = paste0(&#39;ChIP: &#39;, y))+
+      scale_x_continuous(&quot;Position (bp)&quot;, expand = c(0, 0))+
+      scale_y_continuous(&quot;Regions&quot;, expand = c(0, 0))+
+      scale_fill_gradientn(colors = c(&#39;#08306b&#39;, &#39;#08519c&#39; , &#39;#2171b5&#39;, &#39;#4292c6&#39;, &#39;#6baed6&#39;,
+                                      &#39;#9ecae1&#39;, &#39;#c6dbef&#39;,&#39;#deebf7&#39;, &#39;#f7fbff&#39;, &quot;white&quot;, &#39;#fff5f0&#39;,
+                                      &#39;#fee0d2&#39;,&#39;#fcbba1&#39;,&#39;#fc9272&#39;,&#39;#fb6a4a&#39;,&#39;#ef3b2c&#39;,&#39;#cb181d&#39;,&#39;#a50f15&#39;,&#39;#67000d&#39;), name = &quot;norm. signal&quot;) +
+      theme_classic()+
+      theme(text=element_text(size=14), legend.position = &quot;none&quot;, panel.grid = element_blank(), panel.border = element_blank())
+    return(nexus.plot)
+  })
+  
+  hm.plot&lt;-wrap_plots(plots_across_motif.list, nrow = 1) 
+  ggsave(paste0(figure_filepath, &#39;/nexus_heatmap_across_&#39;, x, &#39;_motifs_ANTHOX1_HTH_HA.png&#39;), hm.plot, height = 6, width = 16)
+  ggsave(paste0(figure_filepath, &#39;/nexus_heatmap_across_&#39;, x, &#39;_motifs_ANTHOX1_HTH_HA.pdf&#39;), hm.plot, height = 6, width = 16)
+  return(hm.plot)
+})</code></pre>
+<pre><code>## .
+## ATGATTGATG TTGATTGATG CTGATTGATG GTGATTGATG ATGATTGATT TTGATGGATG TTGATTGATT 
+##         57         45         26         26         21          8          8 
+## ATGATGGATG GTGATTGATA CTGATGGATG CTGATTGATT GTGATTGATT ATGATTGATC GTGATGGATG 
+##          7          6          5          5          5          3          3 
+## ATGACTGATG ATGATCGATG ATGATGGATC CTGATCGATG GTGAGTGATG GTGATCGATG TTGATTGATC 
+##          2          2          2          2          2          2          2 
+## ATGACCGATG ATGATAGATG ATGATTGAGG ATGATTGATA CTGATAGATG CTGATTGATA GTGATCGATC 
+##          1          1          1          1          1          1          1 
+## GTGATCGATT GTGATTGATC TTGATCGATG TTGATTGATA 
+##          1          1          1          1 
+## [1] 250</code></pre>
+<pre><code>## [1] 250</code></pre>
+<pre><code>## .
+## TTGATTGATT ATGATTGATT TTGATTGATG ATGATTGATG ATGATCGATG GTGATTGATT ATGATTGATC 
+##         37         28         28         26         19         14         11 
+## CTGATTGATT ATGATCGATT ATGATTGATA GTGATTGATG TTGATCGATG TTGATCGATT CTGATTGATG 
+##          9          8          8          7          7          7          6 
+## GTGATCGATG GTGATTGATC TTGATCGATA CTGATTGATC TTGATTGATA ATGATCGATA GTGATTGATA 
+##          5          5          5          4          4          3          3 
+## TTGATTGATC GTGATCGATT TTGATCGATC 
+##          3          2          1 
+## [1] 250</code></pre>
+<pre><code>## [1] 250</code></pre>
+<pre><code>## .
+## ATGATTTATGG ATGATTGATGG GTGATTTATCT GTGATTTATGG ATGATTGATGA ATGATTTATGA 
+##          15          14          13          11          10          10 
+## TTGATTTATGA TTGATTTATGG ATGATTTATGT GTGATTTATGA ATGATTTATCA ATGATTTATTG 
+##           9           8           7           7           6           6 
+## CTGATTTATGG TTGATTTATGT ATGATTGATCA ATGATTGATGT CTGATTTATGA CTGATTTATGT 
+##           6           6           5           5           5           5 
+## GTGATTGATGA GTGATTGATGG ATGATTTATGC CTGATTGATGG GTGATTGATGT GTGATTTATCA 
+##           5           5           4           4           4           4 
+## GTGATTTATGC GTGATTTATTA TTGATTGATGG ATGATTGATCT ATGATTTATCT ATGATTTATTA 
+##           4           4           4           3           3           3 
+## ATGATTTATTT CTGATTGATCA GTGATTTATGT GTGATTTATTT TTGATTGATGA TTGATTTATCA 
+##           3           3           3           3           3           3 
+## TTGATTTATCT ATGATTGATTG CTGATTGATGA CTGATTTATCT GTGATTAATGT GTGATTGATCT 
+##           3           2           2           2           2           2 
+## GTGATTTATTG TTGATTGATCA TTGATTGATCT TTGATTTATTT ATGATTAATGA ATGATTAATGG 
+##           2           2           2           2           1           1 
+## ATGATTCATCG ATGATTGATCG ATGATTTATAG ATGATTTATAT CTGATTAATCT CTGATTGATCT 
+##           1           1           1           1           1           1 
+## CTGATTGATGT CTGATTTATCA CTGATTTATGC CTGATTTATTA CTGATTTATTG GTGATTAATGA 
+##           1           1           1           1           1           1 
+## GTGATTGATCA GTGATTTATAT 
+##           1           1 
+## [1] 250</code></pre>
+<pre><code>## [1] 250</code></pre>
+<pre><code>## .
+## ATGATTTATGGCC ATGATTTATGGCA TTGATTTATGGCA ATGATTTATGGCG TTGATTTATGGCC 
+##            29            20            12            11            10 
+## ATGATTTATGGCT TTGATTTATGGCT GTGATTTATGGCA TTGATTTATGGCG GTGATTTATGGCC 
+##             9             9             8             8             7 
+## CTGATTTATGGCC ATGATTGATGGCT ATGATTTATGGGG GTGATTTATTGCC TTGATTGATGGCC 
+##             6             5             5             5             5 
+## CTGATTTATGGCG GTGATTTATGGCG GTGATTTATGTCC ATGATTGATGGCC ATGATTTATGGGC 
+##             4             4             4             3             3 
+## ATGATTTATGGGT ATGATTTATTGCC CTGATTTATGGCT GTGATTTATTGCA ATGATTAATGGCA 
+##             3             3             3             3             2 
+## ATGATTTATGACA ATGATTTATGACC ATGATTTATGCCG ATGATTTATGGAG ATGATTTATGGAT 
+##             2             2             2             2             2 
+## ATGATTTATGGGA ATGATTTATGTCG ATGATTTATTGCA ATGATTTATTGGC GTGATTGATGGCA 
+##             2             2             2             2             2 
+## GTGATTGATGGCC GTGATTTATGACA GTGATTTATGGAT GTGATTTATGGTA AAGATTTATGGCT 
+##             2             2             2             2             1 
+## ATGATTAATGGCC ATGATTAATGGCT ATGATTGATGGCA ATGATTGATTGCC ATGATTTATAGCC 
+##             1             1             1             1             1 
+## ATGATTTATGACG ATGATTTATGACT ATGATTTATGCCA ATGATTTATGCCC ATGATTTATGCCT 
+##             1             1             1             1             1 
+## ATGATTTATGGAA ATGATTTATGGAC ATGATTTATGGTT ATGATTTATGTCC CTGATTGATGGCA 
+##             1             1             1             1             1 
+## CTGATTTATGCCA CTGATTTATGGCA CTGATTTATGGGG GTGATTTATGACC GTGATTTATGGAA 
+##             1             1             1             1             1 
+## GTGATTTATGGAC GTGATTTATGGAG GTGATTTATGGCT GTGATTTATGGGA GTGATTTATGGGG 
+##             1             1             1             1             1 
+## GTGATTTATGGTG TTGATTGATGGCT TTGATTTATGACT TTGATTTATGGAG TTGATTTATGGAT 
+##             1             1             1             1             1 
+## TTGATTTATGGGA TTGATTTATGGGC TTGATTTATGGGG TTGATTTATGGTA TTGATTTATGGTC 
+##             1             1             1             1             1 
+## TTGATTTATGGTG TTGATTTATGGTT TTGATTTATGTCC TTGATTTATTGCA TTGATTTATTGCT 
+##             1             1             1             1             1 
+## [1] 250</code></pre>
+<pre><code>## [1] 250</code></pre>
+<pre><code>## .
+## ATGATTAATGGC ATGATTAATTAC ATGATTAATGAG GTGATTAATTAA GTGATTAATTAT TTGATTAATGAA 
+##            8            7            6            6            6            6 
+## ATGATTAATGAA ATGATTAATTAT GTGATTAATTAG GTGATTGATGGC TTGATTAATTAT ATGATTAATGTC 
+##            5            5            5            5            5            4 
+## ATGATTAATTAA ATGATTAATTAG GTGATTAATCAC GTGATTAATGAA GTGATTGATGAC GTGATTGATGAG 
+##            4            4            4            4            4            4 
+## TTGATTAATTAA TTGATTAATTAC ATGATTAATAAT ATGATTAATCAC CTGATTAATCAG CTGATTAATCTG 
+##            4            4            3            3            3            3 
+## CTGATTAATGAA GTGATTAATCAA GTGATTAATGAC GTGATTAATGAG GTGATTAATGAT GTGATTAATGGC 
+##            3            3            3            3            3            3 
+## GTGATTAATTAC GTGATTAATTTG GTGATTGATGAT TTGATTAATGTG ATGATTAATAAC ATGATTAATCAA 
+##            3            3            3            3            2            2 
+## ATGATTAATCAG ATGATTAATGAT ATGATTAATGGG ATGATTAATGTG ATGATTAATTGG CTGATTAATGTG 
+##            2            2            2            2            2            2 
+## CTGATTAATTAC CTGATTAATTAT GTGATTAATAAT GTGATTAATCGC GTGATTAATGGT GTGATTAATGTA 
+##            2            2            2            2            2            2 
+## GTGATTAATTGG GTGATTGATCAT GTGATTGATGGA GTGATTGATGGG GTGATTGATGTG GTGATTGATTAG 
+##            2            2            2            2            2            2 
+## TTGATTAATAAC TTGATTAATGAC TTGATTAATGGA TTGATTAATGGC TTGATTAATGGT TTGATTAATTGC 
+##            2            2            2            2            2            2 
+## ATGATTAATAAA ATGATTAATAAG ATGATTAATCAT ATGATTAATCTG ATGATTAATGAC ATGATTAATGGA 
+##            1            1            1            1            1            1 
+## ATGATTAATGGT ATGATTAATGTT ATGATTAATTGC ATGATTAATTGT ATGATTGATCAC ATGATTGATGAA 
+##            1            1            1            1            1            1 
+## ATGATTGATGGC ATGATTGATTAC ATGATTTATGAG CTGATTAATAAT CTGATTAATCGC CTGATTAATGAG 
+##            1            1            1            1            1            1 
+## CTGATTAATGGA CTGATTAATGGG CTGATTAATTAA CTGATTAATTAG CTGATTAATTGA CTGATTAATTGC 
+##            1            1            1            1            1            1 
+## CTGATTAATTGG CTGATTGATGTA GTGATTAATCAT GTGATTAATCGA GTGATTAATGGG GTGATTAATGTG 
+##            1            1            1            1            1            1 
+## GTGATTAATGTT GTGATTAATTGC GTGATTAATTTT GTGATTGATCAC GTGATTGATCGA GTGATTGATGAA 
+##            1            1            1            1            1            1 
+## GTGATTGATGGT GTGATTGATGTC GTGATTGATGTT GTGATTGATTAC GTGATTGATTTC GTGATTTATGAG 
+##            1            1            1            1            1            1 
+## TTGATTAATAAA TTGATTAATCAA TTGATTAATCGG TTGATTAATGAG TTGATTAATGAT TTGATTAATGTT 
+##            1            1            1            1            1            1 
+## TTGATTAATTAG TTGATTAATTGT TTGATTAATTTA TTGATTGATGAC TTGATTGATGAG TTGATTGATGAT 
+##            1            1            1            1            1            1 
+## TTGATTGATGGC TTGATTGATGTC 
+##            1            1 
+## [1] 250</code></pre>
+<pre><code>## [1] 250</code></pre>
+<pre><code>## .
+## TTAATGGC TTAATGAC CTAATGGC CTAATGAC 
+##      192       30       17       11 
+## [1] 250</code></pre>
+<pre><code>## [1] 250</code></pre>
+<pre class="r"><code>hm_all.plot&lt;-logos.plot + wrap_plots(hm_plot_all.list, ncol = 1) 
+ggsave(paste0(figure_filepath, &#39;/nexus_heatmap_across_all_motifs_ANTHOX1_HTH_HA.png&#39;), hm_all.plot, height = 24, width = 16)
+ggsave(paste0(figure_filepath, &#39;/nexus_heatmap_across_all_motifs_ANTHOX1_HTH_HA.pdf&#39;), hm_all.plot, height = 24, width = 16)</code></pre>
 </div>
-<div id="collect-and-export-metrics" class="section level1">
-<h1>Collect and export metrics</h1>
-<pre class="r"><code>metrics.df&lt;-&#39;../1_processing/logs/quality_metrics/S2_AntHOX*a_PBX_*_nexus_*_metrics.tsv&#39; %&gt;%
-  Sys.glob(.) %&gt;%
-  lapply(., function(x){
-    message(x)
-    df&lt;-readr::read_tsv(x)
-    df$macs2_peak_n&lt;-readr::read_tsv(paste0(&#39;../1_processing/peaks/&#39;, df$sample_name, &#39;_summits.bed&#39;), col_names = F) %&gt;% nrow(.)
-    return(df)
-  }) %&gt;% rbindlist() %&gt;%
-  as.data.frame()  %&gt;%
-  dplyr::rename(raw_reads = original_fastq_count, 
-                processed_reads = processed_fastq_count, 
-                deduplicated_aligned_reads = deduplicated_read_count) %&gt;%
-  dplyr::mutate(percent_aligned_deduplicated = deduplicated_aligned_reads/raw_reads) %&gt;%
-  dplyr::select(-duplicated_read_count, -uniqueness, -genome_coverage, -percent_sequenced, -unaligned_read_count) %&gt;%
-  dplyr::left_join(samples.df %&gt;% dplyr::select(sample_name, sequencer, condition, sequencing_type))
-
-readr::write_tsv(metrics.df, &#39;tsv/nexus_alignment_metrics.tsv&#39;)</code></pre>
 </div>
 <div id="session-information" class="section level1">
 <h1>Session Information</h1>
@@ -1719,54 +2006,55 @@ information is printed below:</p>
 ## [8] methods   base     
 ## 
 ## other attached packages:
-##  [1] TxDb.Dmelanogaster.UCSC.dm6.ensGene_3.12.0
-##  [2] GenomicFeatures_1.56.0                    
-##  [3] AnnotationDbi_1.66.0                      
-##  [4] Biobase_2.64.0                            
-##  [5] BSgenome.Dmelanogaster.UCSC.dm6_1.4.1     
-##  [6] BSgenome_1.72.0                           
-##  [7] BiocIO_1.14.0                             
-##  [8] viridis_0.6.5                             
-##  [9] viridisLite_0.4.2                         
-## [10] digest_0.6.37                             
-## [11] pander_0.6.6                              
-## [12] lattice_0.22-6                            
-## [13] testit_0.13                               
-## [14] readr_2.1.5                               
-## [15] patchwork_1.3.0                           
-## [16] data.table_1.17.0                         
-## [17] dplyr_1.1.4                               
-## [18] Rsamtools_2.20.0                          
-## [19] plyranges_1.24.0                          
-## [20] reshape2_1.4.4                            
-## [21] ggplot2_3.5.2                             
-## [22] Biostrings_2.72.1                         
-## [23] XVector_0.44.0                            
-## [24] magrittr_2.0.3                            
-## [25] rtracklayer_1.64.0                        
-## [26] GenomicRanges_1.56.2                      
-## [27] GenomeInfoDb_1.40.1                       
-## [28] IRanges_2.38.1                            
-## [29] S4Vectors_0.42.1                          
-## [30] BiocGenerics_0.50.0                       
+##  [1] ggseqlogo_0.2                             
+##  [2] TxDb.Dmelanogaster.UCSC.dm6.ensGene_3.12.0
+##  [3] GenomicFeatures_1.56.0                    
+##  [4] AnnotationDbi_1.66.0                      
+##  [5] Biobase_2.64.0                            
+##  [6] BSgenome.Dmelanogaster.UCSC.dm6_1.4.1     
+##  [7] BSgenome_1.72.0                           
+##  [8] BiocIO_1.14.0                             
+##  [9] viridis_0.6.5                             
+## [10] viridisLite_0.4.2                         
+## [11] digest_0.6.37                             
+## [12] pander_0.6.6                              
+## [13] lattice_0.22-6                            
+## [14] testit_0.13                               
+## [15] readr_2.1.5                               
+## [16] patchwork_1.3.0                           
+## [17] data.table_1.17.0                         
+## [18] dplyr_1.1.4                               
+## [19] Rsamtools_2.20.0                          
+## [20] plyranges_1.24.0                          
+## [21] reshape2_1.4.4                            
+## [22] ggplot2_3.5.2                             
+## [23] Biostrings_2.72.1                         
+## [24] XVector_0.44.0                            
+## [25] magrittr_2.0.3                            
+## [26] rtracklayer_1.64.0                        
+## [27] GenomicRanges_1.56.2                      
+## [28] GenomeInfoDb_1.40.1                       
+## [29] IRanges_2.38.1                            
+## [30] S4Vectors_0.42.1                          
+## [31] BiocGenerics_0.50.0                       
 ## 
 ## loaded via a namespace (and not attached):
 ##  [1] DBI_1.2.3                   bitops_1.0-9               
-##  [3] gridExtra_2.3               readxl_1.4.5               
-##  [5] rlang_1.1.4                 matrixStats_1.5.0          
-##  [7] compiler_4.4.1              RSQLite_2.3.9              
-##  [9] png_0.1-8                   vctrs_0.6.5                
+##  [3] gridExtra_2.3               rlang_1.1.4                
+##  [5] matrixStats_1.5.0           compiler_4.4.1             
+##  [7] RSQLite_2.3.9               png_0.1-8                  
+##  [9] systemfonts_1.2.3           vctrs_0.6.5                
 ## [11] stringr_1.5.1               pkgconfig_2.0.3            
 ## [13] crayon_1.5.3                fastmap_1.2.0              
-## [15] rmarkdown_2.29              tzdb_0.4.0                 
-## [17] UCSC.utils_1.0.0            purrr_1.0.2                
-## [19] bit_4.6.0                   xfun_0.51                  
-## [21] zlibbioc_1.50.0             cachem_1.1.0               
-## [23] jsonlite_1.8.9              blob_1.2.4                 
-## [25] DelayedArray_0.30.1         BiocParallel_1.38.0        
-## [27] R6_2.5.1                    bslib_0.8.0                
-## [29] stringi_1.8.4               jquerylib_0.1.4            
-## [31] cellranger_1.1.0            Rcpp_1.0.14                
+## [15] labeling_0.4.3              rmarkdown_2.29             
+## [17] tzdb_0.4.0                  UCSC.utils_1.0.0           
+## [19] ragg_1.3.3                  bit_4.6.0                  
+## [21] xfun_0.51                   zlibbioc_1.50.0            
+## [23] cachem_1.1.0                jsonlite_1.8.9             
+## [25] blob_1.2.4                  DelayedArray_0.30.1        
+## [27] BiocParallel_1.38.0         R6_2.5.1                   
+## [29] bslib_0.8.0                 stringi_1.8.4              
+## [31] jquerylib_0.1.4             Rcpp_1.0.14                
 ## [33] SummarizedExperiment_1.34.0 knitr_1.50                 
 ## [35] Matrix_1.7-0                tidyselect_1.2.1           
 ## [37] rstudioapi_0.17.1           abind_1.4-8                
@@ -1780,9 +2068,9 @@ information is printed below:</p>
 ## [53] munsell_0.5.1               scales_1.3.0               
 ## [55] glue_1.8.0                  tools_4.4.1                
 ## [57] GenomicAlignments_1.40.0    XML_3.99-0.18              
-## [59] grid_4.4.1                  tidyr_1.3.1                
-## [61] colorspace_2.1-1            GenomeInfoDbData_1.2.12    
-## [63] restfulr_0.0.15             cli_3.6.3                  
+## [59] grid_4.4.1                  colorspace_2.1-1           
+## [61] GenomeInfoDbData_1.2.12     restfulr_0.0.15            
+## [63] cli_3.6.3                   textshaping_1.0.0          
 ## [65] S4Arrays_1.4.1              gtable_0.3.6               
 ## [67] sass_0.4.9                  SparseArray_1.4.8          
 ## [69] rjson_0.2.23                farver_2.1.2               

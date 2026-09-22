@@ -7597,13 +7597,13 @@ a.anchor-link {
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-03-05 08:53:28.392811: E external/local_xla/xla/stream_executor/cuda/cuda_fft.cc:477] Unable to register cuFFT factory: Attempting to register factory for plugin cuFFT when one has already been registered
+<pre>2026-08-19 09:15:12.584139: E external/local_xla/xla/stream_executor/cuda/cuda_fft.cc:477] Unable to register cuFFT factory: Attempting to register factory for plugin cuFFT when one has already been registered
 WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
-E0000 00:00:1772722408.411931 4031351 cuda_dnn.cc:8310] Unable to register cuDNN factory: Attempting to register factory for plugin cuDNN when one has already been registered
-E0000 00:00:1772722408.417808 4031351 cuda_blas.cc:1418] Unable to register cuBLAS factory: Attempting to register factory for plugin cuBLAS when one has already been registered
-2026-03-05 08:53:28.438852: I tensorflow/core/platform/cpu_feature_guard.cc:210] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+E0000 00:00:1787148912.603237  640244 cuda_dnn.cc:8310] Unable to register cuDNN factory: Attempting to register factory for plugin cuDNN when one has already been registered
+E0000 00:00:1787148912.609075  640244 cuda_blas.cc:1418] Unable to register cuBLAS factory: Attempting to register factory for plugin cuBLAS when one has already been registered
+2026-08-19 09:15:12.632120: I tensorflow/core/platform/cpu_feature_guard.cc:210] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
 To enable the following instructions: AVX2 AVX512F FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
-2026-03-05 08:53:34.884437: E external/local_xla/xla/stream_executor/cuda/cuda_driver.cc:152] failed call to cuInit: INTERNAL: CUDA error: Failed call to cuInit: UNKNOWN ERROR (303)
+2026-08-19 09:16:49.367316: E external/local_xla/xla/stream_executor/cuda/cuda_driver.cc:152] failed call to cuInit: INTERNAL: CUDA error: Failed call to cuInit: UNKNOWN ERROR (303)
 </pre>
 </div>
 </div>
@@ -7687,7 +7687,7 @@ To enable the following instructions: AVX2 AVX512F FMA, in other operations, reb
 <span class="n">early_stopping_patience</span> <span class="o">=</span> <span class="mi">11</span>
 <span class="n">reverse_complement</span> <span class="o">=</span> <span class="kc">True</span>
 <span class="n">seed</span> <span class="o">=</span> <span class="mi">2346</span>
-<span class="n">trials</span> <span class="o">=</span> <span class="mi">64</span>
+<span class="n">trials</span> <span class="o">=</span> <span class="mi">256</span>
 
 <span class="c1">#Annotations</span>
 <span class="n">working_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">()</span>
@@ -8388,7 +8388,7 @@ To enable the following instructions: AVX2 AVX512F FMA, in other operations, reb
                         <span class="n">df</span><span class="p">[</span><span class="n">counts_metrics_of_interest</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">metrics_dict</span><span class="p">[</span><span class="n">metric</span><span class="p">]</span> <span class="k">for</span> <span class="n">metric</span> <span class="ow">in</span> <span class="n">counts_metrics_of_interest</span><span class="p">]</span>
                         <span class="n">metrics_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">metrics_df</span><span class="p">,</span> <span class="n">df</span><span class="p">])</span>
 
-<span class="n">metrics_df</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="s1">'tsv/performance_metrics_across_solo_optimized.tsv.gz'</span><span class="p">,</span> <span class="n">sep</span> <span class="o">=</span> <span class="s1">'</span><span class="se">\t</span><span class="s1">'</span><span class="p">,</span> <span class="n">index</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span>
+<span class="c1"># metrics_df.to_csv('tsv/performance_metrics_across_solo_optimized.tsv.gz', sep = '\t', index = False)</span>
 </pre></div>
 </div>
 </div>
@@ -10428,10 +10428,10 @@ To enable the following instructions: AVX2 AVX512F FMA, in other operations, reb
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
-I0000 00:00:1772722428.500362 4032127 service.cc:148] XLA service 0x147a7800a760 initialized for platform Host (this does not guarantee that XLA will be used). Devices:
-I0000 00:00:1772722428.500410 4032127 service.cc:156]   StreamExecutor device (0): Host, Default Version
-2026-03-05 08:53:48.544948: I tensorflow/compiler/mlir/tensorflow/utils/dump_mlir_util.cc:268] disabling MLIR crash reproducer, set env var `MLIR_CRASH_REPRODUCER_DIRECTORY` to enable.
-I0000 00:00:1772722428.736052 4032127 device_compiler.h:188] Compiled cluster using XLA!  This line is logged at most once for the lifetime of the process.
+I0000 00:00:1787149028.719569  641499 service.cc:148] XLA service 0x14afa800a760 initialized for platform Host (this does not guarantee that XLA will be used). Devices:
+I0000 00:00:1787149028.719659  641499 service.cc:156]   StreamExecutor device (0): Host, Default Version
+2026-08-19 09:17:08.757973: I tensorflow/compiler/mlir/tensorflow/utils/dump_mlir_util.cc:268] disabling MLIR crash reproducer, set env var `MLIR_CRASH_REPRODUCER_DIRECTORY` to enable.
+I0000 00:00:1787149028.932511  641499 device_compiler.h:188] Compiled cluster using XLA!  This line is logged at most once for the lifetime of the process.
 </pre>
 </div>
 </div>
@@ -10512,7 +10512,7 @@ I0000 00:00:1772722428.736052 4032127 device_compiler.h:188] Compiled cluster us
 <th>95995</th>
 <td>995</td>
 <td>neg</td>
-<td>-0.388122</td>
+<td>-0.431520</td>
 <td>s2_anthox1a_pbx_ha_nexus_fold3</td>
 <td>pbx</td>
 <td>Dfd</td>
@@ -10524,7 +10524,7 @@ I0000 00:00:1772722428.736052 4032127 device_compiler.h:188] Compiled cluster us
 <th>95996</th>
 <td>996</td>
 <td>neg</td>
-<td>-0.398127</td>
+<td>-0.449604</td>
 <td>s2_anthox1a_pbx_ha_nexus_fold3</td>
 <td>pbx</td>
 <td>Dfd</td>
@@ -10536,7 +10536,7 @@ I0000 00:00:1772722428.736052 4032127 device_compiler.h:188] Compiled cluster us
 <th>95997</th>
 <td>997</td>
 <td>neg</td>
-<td>-0.410542</td>
+<td>-0.419425</td>
 <td>s2_anthox1a_pbx_ha_nexus_fold3</td>
 <td>pbx</td>
 <td>Dfd</td>
@@ -10548,7 +10548,7 @@ I0000 00:00:1772722428.736052 4032127 device_compiler.h:188] Compiled cluster us
 <th>95998</th>
 <td>998</td>
 <td>neg</td>
-<td>-0.422820</td>
+<td>-0.426750</td>
 <td>s2_anthox1a_pbx_ha_nexus_fold3</td>
 <td>pbx</td>
 <td>Dfd</td>
@@ -10560,7 +10560,7 @@ I0000 00:00:1772722428.736052 4032127 device_compiler.h:188] Compiled cluster us
 <th>95999</th>
 <td>999</td>
 <td>neg</td>
-<td>-0.413633</td>
+<td>-0.416095</td>
 <td>s2_anthox1a_pbx_ha_nexus_fold3</td>
 <td>pbx</td>
 <td>Dfd</td>
@@ -10628,37 +10628,20 @@ I0000 00:00:1772722428.736052 4032127 device_compiler.h:188] Compiled cluster us
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>100%|█████████████████████████████████████████████| 4/4 [00:14&lt;00:00,  3.67s/it]
+<pre>100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████| 4/4 [00:18&lt;00:00,  4.56s/it]
 </pre>
 </div>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
-<div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div>
-<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
-<div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span> 
-</pre></div>
-</div>
-</div>
-</div>
-</div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div>
-<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
-<div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span> 
-</pre></div>
-</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h1 id="Conduct-formal-marginalizations">Conduct formal marginalizations<a class="anchor-link" href="#Conduct-formal-marginalizations">¶</a></h1><h2 id="SLURM-function">SLURM function<a class="anchor-link" href="#SLURM-function">¶</a></h2><p>Here, we wanted to now investigate a braoder set of motif pair injections. We set up code to look at pairwise varying affinities of all motif pairs using <code>generate_insilico_perturbs_across_affinities.py</code>.</p>
 </div>
 </div>
 </div>
@@ -10667,11 +10650,174 @@ I0000 00:00:1772722428.736052 4032127 device_compiler.h:188] Compiled cluster us
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [30]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span> 
+<div class="highlight hl-ipython3"><pre><span></span><span class="k">def</span> <span class="nf">write_insilico_perturbs_across_affinities</span><span class="p">(</span><span class="n">output_script_path</span><span class="p">,</span> <span class="n">seqA_txt_filepath</span><span class="p">,</span> <span class="n">motifA_name</span><span class="p">,</span> 
+                                                  <span class="n">seqB_txt_filepath</span><span class="p">,</span> <span class="n">motifB_name</span><span class="p">,</span> 
+                                                  <span class="n">model_dir</span><span class="p">,</span> <span class="n">null_sequence_np_filepath</span><span class="p">,</span> 
+                                                  <span class="n">tasks_separated_by_commas</span><span class="p">,</span> <span class="n">output_tsv_path</span><span class="p">,</span>
+                                                  <span class="n">input_length</span> <span class="o">=</span> <span class="mi">2032</span><span class="p">,</span> <span class="n">output_length</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
+                                                  <span class="n">motifA_output_position</span> <span class="o">=</span> <span class="mi">470</span><span class="p">,</span>
+                                                  <span class="n">motifB_output_position</span> <span class="o">=</span> <span class="mi">530</span><span class="p">):</span>
+    <span class="n">working_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">()</span>
+    <span class="n">gpu_header</span> <span class="o">=</span> <span class="p">[</span><span class="s1">'#!/bin/bash'</span><span class="p">,</span>
+                      <span class="s1">'#SBATCH --job-name marginalizations'</span><span class="p">,</span>
+                      <span class="s1">'#SBATCH --output=slurm_%j.log'</span><span class="p">,</span>
+                      <span class="s1">'#SBATCH --mem=75gb'</span><span class="p">,</span> <span class="s1">'#SBATCH --time=48:00:00'</span><span class="p">,</span>
+                      <span class="s1">'#SBATCH --partition=gpu'</span><span class="p">,</span> <span class="s1">'#SBATCH --gres=gpu:1'</span><span class="p">,</span>
+                      <span class="s1">'#SBATCH --cpus-per-task=10'</span><span class="p">,</span>
+                      <span class="s1">'source /home/mw2098/.bashrc'</span><span class="p">,</span>
+                      <span class="s1">'conda deactivate'</span><span class="p">,</span>
+                      <span class="s1">'conda activate bpreveal_404'</span><span class="p">,</span>
+                      <span class="sa">f</span><span class="s1">'cd </span><span class="si">{</span><span class="n">working_dir</span><span class="si">}</span><span class="s1">'</span><span class="p">]</span>
+
+    <span class="n">insilico</span> <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s1">'</span><span class="si">{</span><span class="n">python_path</span><span class="si">}</span><span class="s1"> scripts/py/tools/generate_insilico_perturbs_across_affinities.py </span><span class="se">\\</span><span class="s1">'</span><span class="p">,</span>
+                <span class="sa">f</span><span class="s1">'--model_dir </span><span class="si">{</span><span class="n">model_dir</span><span class="si">}</span><span class="s1"> </span><span class="se">\\</span><span class="s1">'</span><span class="p">,</span>
+                <span class="sa">f</span><span class="s1">'--null_sequence_np_filepath </span><span class="si">{</span><span class="n">null_sequence_np_filepath</span><span class="si">}</span><span class="s1"> </span><span class="se">\\</span><span class="s1">'</span><span class="p">,</span>
+                <span class="sa">f</span><span class="s1">'--tasks_separated_by_commas </span><span class="si">{</span><span class="n">tasks_separated_by_commas</span><span class="si">}</span><span class="s1"> </span><span class="se">\\</span><span class="s1">'</span><span class="p">,</span>
+                <span class="sa">f</span><span class="s1">'--output_tsv_path </span><span class="si">{</span><span class="n">output_tsv_path</span><span class="si">}</span><span class="s1"> </span><span class="se">\\</span><span class="s1">'</span><span class="p">,</span>
+                <span class="sa">f</span><span class="s1">'--seqA_txt_filepath </span><span class="si">{</span><span class="n">seqA_txt_filepath</span><span class="si">}</span><span class="s1"> </span><span class="se">\\</span><span class="s1">'</span><span class="p">,</span>
+                <span class="sa">f</span><span class="s1">'--motifA_name </span><span class="si">{</span><span class="n">motifA_name</span><span class="si">}</span><span class="s1"> </span><span class="se">\\</span><span class="s1">'</span><span class="p">,</span>
+                <span class="sa">f</span><span class="s1">'--motifA_output_position </span><span class="si">{</span><span class="n">motifA_output_position</span><span class="si">}</span><span class="s1"> </span><span class="se">\\</span><span class="s1">'</span><span class="p">,</span>
+                <span class="sa">f</span><span class="s1">'--seqB_txt_filepath </span><span class="si">{</span><span class="n">seqB_txt_filepath</span><span class="si">}</span><span class="s1"> </span><span class="se">\\</span><span class="s1">'</span><span class="p">,</span>
+                <span class="sa">f</span><span class="s1">'--motifB_name </span><span class="si">{</span><span class="n">motifB_name</span><span class="si">}</span><span class="s1"> </span><span class="se">\\</span><span class="s1">'</span><span class="p">,</span>
+                <span class="sa">f</span><span class="s1">'--motifB_output_position </span><span class="si">{</span><span class="n">motifB_output_position</span><span class="si">}</span><span class="s1"> </span><span class="se">\\</span><span class="s1">'</span><span class="p">,</span>
+                <span class="sa">f</span><span class="s1">'--input_length </span><span class="si">{</span><span class="n">input_length</span><span class="si">}</span><span class="s1"> </span><span class="se">\\</span><span class="s1">'</span><span class="p">,</span>
+                <span class="sa">f</span><span class="s1">'--output_length </span><span class="si">{</span><span class="n">output_length</span><span class="si">}</span><span class="s1">'</span><span class="p">]</span>
+
+    <span class="c1">#Write the script</span>
+    <span class="n">cmds</span> <span class="o">=</span> <span class="n">gpu_header</span> <span class="o">+</span> <span class="n">insilico</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">output_script_path</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">'wt'</span><span class="p">)</span> <span class="k">as</span> <span class="n">script</span><span class="p">:</span>
+        <span class="n">script</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">'</span><span class="se">\n</span><span class="s1">'</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">cmds</span><span class="p">))</span>
+        <span class="n">script</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">'</span><span class="se">\n</span><span class="s1">'</span><span class="p">)</span>
 </pre></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h2 id="Generate-sequences">Generate sequences<a class="anchor-link" href="#Generate-sequences">¶</a></h2>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [31]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">output_seq_path</span> <span class="o">=</span> <span class="s1">'tsv/insilico_hox_seqs.tsv'</span>
+<span class="c1"># seqs_df = pd.DataFrame(['TGATTGATGGC', 'TGATTAATGGC', 'TGATTTATGGC'], columns = ['seq'])</span>
+<span class="n">seqs_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">([</span><span class="s1">'TGATTGAT'</span><span class="p">,</span> <span class="s1">'TGATTAAT'</span><span class="p">,</span> <span class="s1">'TGATTTAT'</span><span class="p">],</span> <span class="n">columns</span> <span class="o">=</span> <span class="p">[</span><span class="s1">'seq'</span><span class="p">])</span>
+<span class="n">seqs_df</span><span class="p">[</span><span class="s1">'motif'</span><span class="p">]</span> <span class="o">=</span> <span class="s1">'all'</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">seqs_df</span><span class="p">)</span>
+<span class="n">seqs_df</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">output_seq_path</span><span class="p">,</span> <span class="n">sep</span> <span class="o">=</span> <span class="s1">'</span><span class="se">\t</span><span class="s1">'</span><span class="p">,</span> <span class="n">index</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>        seq motif
+0  TGATTGAT   all
+1  TGATTAAT   all
+2  TGATTTAT   all
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h2 id="Generate-scores">Generate scores<a class="anchor-link" href="#Generate-scores">¶</a></h2>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<p>Next, we will generate accessibility and binding marginalizations across all null sequence sets.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [32]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="o">!</span>mkdir<span class="w"> </span>-p<span class="w"> </span>scripts/insilico<span class="w"> </span>tsv/insilico
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [33]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="k">for</span> <span class="n">k</span><span class="p">,</span><span class="n">v</span> <span class="ow">in</span> <span class="n">modeling_design_dict</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+    <span class="n">output_script_path</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">'scripts/insilico/generate_motif_marginalizations_</span><span class="si">{</span><span class="n">k</span><span class="si">}</span><span class="s1">.slurm'</span>
+    <span class="n">write_insilico_perturbs_across_affinities</span><span class="p">(</span>
+        <span class="n">input_length</span> <span class="o">=</span> <span class="n">input_length_dict</span><span class="p">[</span><span class="n">v</span><span class="p">[</span><span class="s1">'train_settings_name'</span><span class="p">]],</span>
+        <span class="n">output_script_path</span> <span class="o">=</span> <span class="n">output_script_path</span><span class="p">,</span> 
+        <span class="n">null_sequence_np_filepath</span> <span class="o">=</span> <span class="s1">'npz/random_seqs_seed_2346_input_3056_trials_256_array.npz'</span><span class="p">,</span>
+        <span class="n">seqA_txt_filepath</span> <span class="o">=</span> <span class="n">output_seq_path</span><span class="p">,</span> 
+        <span class="n">motifA_name</span> <span class="o">=</span> <span class="s1">'all'</span><span class="p">,</span> 
+        <span class="n">seqB_txt_filepath</span> <span class="o">=</span> <span class="s1">'tsv/mapped_motifs/filler.tsv.gz'</span><span class="p">,</span> 
+        <span class="n">motifB_name</span> <span class="o">=</span> <span class="s1">'empty'</span><span class="p">,</span> <span class="c1">#This string triggers an if statement that suppresses extra predictions</span>
+        <span class="n">model_dir</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">'models/</span><span class="si">{</span><span class="n">k</span><span class="si">}</span><span class="s1">_fold1.keras'</span><span class="p">,</span> 
+        <span class="n">tasks_separated_by_commas</span> <span class="o">=</span> <span class="s1">','</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">v</span><span class="p">[</span><span class="s1">'cov'</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">()),</span> 
+        <span class="n">output_tsv_path</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">'tsv/insilico/insilico_hox_marginalizations_</span><span class="si">{</span><span class="n">k</span><span class="si">}</span><span class="s1">.tsv.gz'</span><span class="p">,</span>
+        <span class="n">motifA_output_position</span> <span class="o">=</span> <span class="mi">500</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">'sbatch </span><span class="si">{</span><span class="n">output_script_path</span><span class="si">}</span><span class="s1">'</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>sbatch scripts/insilico/generate_motif_marginalizations_s2_anthox6a_pbx_flag_nexus.slurm
+sbatch scripts/insilico/generate_motif_marginalizations_s2_anthox6a_pbx_ha_nexus.slurm
+sbatch scripts/insilico/generate_motif_marginalizations_s2_anthox1a_pbx_flag_nexus.slurm
+sbatch scripts/insilico/generate_motif_marginalizations_s2_anthox1a_pbx_ha_nexus.slurm
+</pre>
 </div>
 </div>
 </div>

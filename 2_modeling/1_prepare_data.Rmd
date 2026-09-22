@@ -25,7 +25,7 @@ editor_options:
 
 # Introduction
 
-The goal of this .Rmd is to prepare all aligned samples and published data for deep learning training and downstream analysis. 
+The goal of this .Rmd is to prepare all aligned samples and published data for deep learning training and downstream analysis. Further, we will document alignment statistics of every ChIP-nexus experiment.
 
 # Computational Setup
 
@@ -215,6 +215,28 @@ filler<-lapply(all_samples %>% grep('nexus', ., value = T), function(x){
   neg_rpm.bw<-neg_combined.bw/total_reads*1000000
   rtracklayer::export(neg_rpm.bw, paste0('bw/', x, '_combined_normalized_negative.bw'), format = "BigWig")       
 })
+```
+
+# Collect and export metrics
+
+```{r}
+metrics.df<-'../1_processing/logs/quality_metrics/S2_AntHOX*a_PBX_*_nexus_*_metrics.tsv' %>%
+  Sys.glob(.) %>%
+  lapply(., function(x){
+    message(x)
+    df<-readr::read_tsv(x)
+    df$macs2_peak_n<-readr::read_tsv(paste0('../1_processing/peaks/', df$sample_name, '_summits.bed'), col_names = F) %>% nrow(.)
+    return(df)
+  }) %>% rbindlist() %>%
+  as.data.frame()  %>%
+  dplyr::rename(raw_reads = original_fastq_count, 
+                processed_reads = processed_fastq_count, 
+                deduplicated_aligned_reads = deduplicated_read_count) %>%
+  dplyr::mutate(percent_aligned_deduplicated = deduplicated_aligned_reads/raw_reads) %>%
+  dplyr::select(-duplicated_read_count, -uniqueness, -genome_coverage, -percent_sequenced, -unaligned_read_count) %>%
+  dplyr::left_join(samples.df %>% dplyr::select(sample_name, sequencer, condition, sequencing_type))
+
+readr::write_tsv(metrics.df, 'tsv/nexus_alignment_metrics.tsv')
 ```
 
 # Session Information

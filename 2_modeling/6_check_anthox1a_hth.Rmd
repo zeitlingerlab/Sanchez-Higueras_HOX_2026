@@ -1,0 +1,271 @@
+---
+title: 'Check AntHOX1a-Hth binding'
+author: "Melanie (1028-02098-001-001)"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output:
+  html_document:
+    depth: 3
+    theme: sandstone
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+  word_document:
+    toc: yes
+header-includes:
+- \usepackage{fancyhdr}
+- \usepackage{lipsum}
+- \pagestyle{fancy}
+- \fancyfoot[CO,CE]{1028-02098-001-001}
+- \fancyfoot[LE,RO]{\thepage}
+- \fancypagestyle{plain}{\pagestyle{fancy}}
+editor_options:
+  chunk_output_type: console
+---
+
+# Introduction
+
+Given different motifs mapped by our models, do we also see binding across either the heterodimer or the monomer for AntHOX1a-Hth experiments?
+
+# Computational Setup
+
+```{r, warning=F, message=F}
+#Standard packages
+library(rtracklayer) ; library(GenomicRanges); library(magrittr) ; library(Biostrings)
+library(ggplot2) ; library(reshape2); library(plyranges); library(Rsamtools); library(parallel)
+library(dplyr); library(data.table); library(patchwork); library(readr); library(testit)
+
+#KNITR Options
+setwd("/n/projects/mw2098/collaboration/for_carlos/20260205_manuscript/2_modeling/")
+figure_filepath<-'figures/6_check_antihox1a_hth'
+options(knitr.figure_dir=figure_filepath)
+
+#Lab sources
+source("scripts/r/granges_common.r")
+source("scripts/r/metapeak_common.r")
+source("scripts/r/knitr_common.r")
+source("scripts/r/caching.r")
+source("scripts/r/metapeak_functions.r")
+source("scripts/r/motif_functions.r")
+
+#Specific sources
+library(BSgenome.Dmelanogaster.UCSC.dm6)
+library(TxDb.Dmelanogaster.UCSC.dm6.ensGene)
+library(ggseqlogo)
+
+#Pre-existing variables
+threads <- 5
+dir.create('bed/mapped_motifs', recursive = T, showWarnings = F)
+dir.create('tsv/mapped_motifs', recursive = T, showWarnings = F)
+dir.create('rdata/mapped_motifs', recursive = T, showWarnings = F)
+bsgenome<-BSgenome.Dmelanogaster.UCSC.dm6
+txdb<-TxDb.Dmelanogaster.UCSC.dm6.ensGene
+
+#variable/model information
+output_length<-1000
+bg_freqs<-c(.27, .21, .21, .27)
+```
+
+# Import motifs
+
+```{r}
+# #If starting from .bed files
+# motifs.list.gr<-'bed/mapped_motifs/all_instances_curated_s2_*.bed' %>%
+#   Sys.glob(.) %>%
+#   lapply(., function(x){
+#     rtracklayer::import(x)
+#   })
+# names(motifs.list.gr)<-basename(Sys.glob('bed/mapped_motifs/all_instances_curated_s2_*.bed')) %>%
+#   gsub('all_instances_curated_s2_', '', .) %>%
+#   gsub('_nexus_fold1_pbx_counts_0based.bed', '', .) %>%
+#   gsub('_nexus_fold1_dfd_counts_0based.bed', '', .)
+
+#If starting from .tsv riles
+all_motifs.gr<-readr::read_tsv('tsv/mapped_motifs/all_instances_curated_1based.tsv.gz') %>%
+  makeGRangesFromDataFrame(keep.extra.columns = T)
+
+motifs.list.gr<-lapply(all_motifs.gr$model %>% unique, function(x){
+    all_motifs.gr %>% plyranges::filter(model == x)
+  })
+names(motifs.list.gr)<-all_motifs.gr$model %>% unique %>%
+  gsub('all_instances_curated_s2_', '', .) %>%
+  gsub('_nexus_fold1_pbx_counts', '', .) %>%
+  gsub('_nexus_fold1_dfd_counts', '', .)
+  
+logos.plot<-lapply(motifs.list.gr, function(x){
+  getSeq(bsgenome, x, as.character = T)
+}) %>% ggseqlogo(.) + facet_wrap(~seq_group, ncol = 1)
+
+```
+
+# Allocate coverage and settings
+
+```{r}
+nexus_bw.list<-list(
+  
+  #Experiment corresponding to motifs that worked
+  
+  S2_AntHOX6a_PBX_Flag = list(pos = 'bw/S2_AntHOX6a_PBX_Flag_nexus_combined_positive.bw',
+                              neg = 'bw/S2_AntHOX6a_PBX_Flag_nexus_combined_negative.bw') %>%
+    mclapply(., function(x) {rtracklayer::import.bw(x, as="RleList")}, mc.cores = 1),
+  
+  S2_AntHOX6a_PBX_HA = list(pos = 'bw/S2_AntHOX6a_PBX_HA_nexus_combined_positive.bw',
+                            neg = 'bw/S2_AntHOX6a_PBX_HA_nexus_combined_negative.bw') %>%
+    mclapply(., function(x) {rtracklayer::import.bw(x, as="RleList")}, mc.cores = 1),
+  
+  S2_AntHOX1a_PBX_Flag = list(pos = 'bw/S2_AntHOX1a_PBX_Flag_nexus_combined_positive.bw',
+                              neg = 'bw/S2_AntHOX1a_PBX_Flag_nexus_combined_negative.bw') %>%
+    mclapply(., function(x) {rtracklayer::import.bw(x, as="RleList")}, mc.cores = 1),
+  
+  S2_AntHOX1a_PBX_HA = list(pos = 'bw/S2_AntHOX1a_PBX_HA_nexus_combined_positive.bw',
+                            neg = 'bw/S2_AntHOX1a_PBX_HA_nexus_combined_negative.bw') %>%
+    mclapply(., function(x) {rtracklayer::import.bw(x, as="RleList")}, mc.cores = 1),
+  
+  S2_Dfd_Hth_HA = list(pos = 'bw/S2_Dfd_Hth_HA_nexus_combined_positive.bw',
+                       neg = 'bw/S2_Dfd_Hth_HA_nexus_combined_negative.bw') %>%
+    mclapply(., function(x) {rtracklayer::import.bw(x, as="RleList")}, mc.cores = 1),
+  
+  S2_Dfd_Hth_EXD = list(pos = 'bw/S2_Dfd_Hth_anti_EXD_nexus_combined_positive.bw',
+                        neg = 'bw/S2_Dfd_Hth_anti_EXD_nexus_combined_negative.bw') %>%
+    mclapply(., function(x) {rtracklayer::import.bw(x, as="RleList")}, mc.cores = 1),
+  
+  #Experiments to test binding across
+  S2_AntHOX1a_Hth_HA = list(pos = '../../20250717_hox/2_analysis/bw/S2_AntHOX1a_Hth_HA_nexus_combined_positive.bw',
+                              neg = '../../20250717_hox/2_analysis/bw/S2_AntHOX1a_Hth_HA_nexus_combined_negative.bw') %>%
+    mclapply(., function(x) {rtracklayer::import.bw(x, as="RleList")}, mc.cores = 1),
+  S2_AntHOX1_Hth_HA = list(pos = '../../20250717_hox/2_analysis/bw/S2_AntHOX1_Hth_HA_nexus_combined_positive.bw',
+                             neg = '../../20250717_hox/2_analysis/bw/S2_AntHOX1_Hth_HA_nexus_combined_negative.bw') %>%
+    mclapply(., function(x) {rtracklayer::import.bw(x, as="RleList")}, mc.cores = 1)  
+  )
+
+#Define how many motifs to consider
+top_n = 250
+```
+
+# Visualize ChIP-nexus coverage
+
+Given the set of motifs, what do ChIP-nexus heatmaps look like across the top motifs per logo?
+
+We define top motifs here as most reads in region.
+
+## ANTHOX1a-Hth
+
+```{r}
+hm_plot_all.list<-lapply(names(motifs.list.gr), function(x){
+  message(x)
+  matched_experiment<-names(nexus_bw.list)[grepl(x, names(nexus_bw.list), ignore.case = T)]
+  
+  # #If ordering by total reads
+  # m.gr<-motifs.list.gr[[x]] %>%  
+  #   plyranges::mutate(total_reads = regionSums(GenomicRanges::resize(., 100, 'center'), nexus_bw.list[[matched_experiment]]$pos) + abs(regionSums(GenomicRanges::resize(., 100, 'center'), nexus_bw.list[[matched_experiment]]$neg))) %>%
+  #   plyranges::arrange(desc(total_reads)) %>% 
+  #   head(n=top_n) %>% 
+  #   plyranges::arrange(total_reads) %>%
+  #   plyranges::mutate(seq = getSeq(bsgenome, ., as.character = T))
+  
+  #If ordering by cwm match scores
+  m.gr<-motifs.list.gr[[x]] %>%  
+    plyranges::arrange(desc(contrib_match)) %>% 
+    head(n=top_n) %>% 
+    plyranges::arrange(contrib_match) %>%
+    plyranges::mutate(seq = getSeq(bsgenome, ., as.character = T))
+    
+  print(m.gr$seq %>% table %>% sort(decreasing = T))
+  
+  plots_across_motif.list<-lapply(c(matched_experiment, 'S2_AntHOX1a_Hth_HA'), function(y){
+    nexus.df<-plot_nexus_heatmap(regions.gr = GenomicRanges::resize(m.gr, width = 1, fix = 'center'), 
+                                   sample = nexus_bw.list[[y]], upstream = 150, downstream = 151, 
+                                   title = y, order = 'asis', removal_threshold = .8, normalize_threshold = .999,
+                                   return_only_df = T) #.8, .99
+    
+    nexus.plot<-ggplot()+
+      geom_tile(data=nexus.df %>% dplyr::filter(strand == 'pos'), aes(x=position, y=region, fill=signal))+
+      geom_tile(data=nexus.df %>% dplyr::filter(strand == 'neg'), aes(x=position, y=region, fill=-signal), alpha=.5)+
+      ggtitle(paste0('Motif: ', m.gr$name %>% unique, '\nfrom model\n', x), subtitle = paste0('ChIP: ', y))+
+      scale_x_continuous("Position (bp)", expand = c(0, 0))+
+      scale_y_continuous("Regions", expand = c(0, 0))+
+      scale_fill_gradientn(colors = c('#08306b', '#08519c' , '#2171b5', '#4292c6', '#6baed6',
+                                      '#9ecae1', '#c6dbef','#deebf7', '#f7fbff', "white", '#fff5f0',
+                                      '#fee0d2','#fcbba1','#fc9272','#fb6a4a','#ef3b2c','#cb181d','#a50f15','#67000d'), name = "norm. signal") +
+      theme_classic()+
+      theme(text=element_text(size=14), legend.position = "none", panel.grid = element_blank(), panel.border = element_blank())
+    return(nexus.plot)
+  })
+  
+  hm.plot<-wrap_plots(plots_across_motif.list, nrow = 1) 
+  ggsave(paste0(figure_filepath, '/nexus_heatmap_across_', x, '_motifs_ANTHOX1a_HTH_HA.png'), hm.plot, height = 6, width = 16)
+  ggsave(paste0(figure_filepath, '/nexus_heatmap_across_', x, '_motifs_ANTHOX1a_HTH_HA.pdf'), hm.plot, height = 6, width = 16)
+  return(hm.plot)
+})
+
+hm_all.plot<-logos.plot + wrap_plots(hm_plot_all.list, ncol = 1) 
+ggsave(paste0(figure_filepath, '/nexus_heatmap_across_all_motifs_ANTHOX1a_HTH_HA.png'), hm_all.plot, height = 24, width = 16)
+ggsave(paste0(figure_filepath, '/nexus_heatmap_across_all_motifs_ANTHOX1a_HTH_HA.pdf'), hm_all.plot, height = 24, width = 16)
+```
+
+## ANTHOX1-Hth
+
+```{r}
+hm_plot_all.list<-lapply(names(motifs.list.gr), function(x){
+  message(x)
+  matched_experiment<-names(nexus_bw.list)[grepl(x, names(nexus_bw.list), ignore.case = T)]
+  
+  #If ordering by cwm match scores
+  m.gr<-motifs.list.gr[[x]] %>%  
+    plyranges::arrange(desc(contrib_match)) %>% 
+    head(n=top_n) %>% 
+    plyranges::arrange(contrib_match) %>%
+    plyranges::mutate(seq = getSeq(bsgenome, ., as.character = T))
+    
+  print(m.gr$seq %>% table %>% sort(decreasing = T))
+  
+  plots_across_motif.list<-lapply(c(matched_experiment, 'S2_AntHOX1_Hth_HA'), function(y){
+    nexus.df<-plot_nexus_heatmap(regions.gr = GenomicRanges::resize(m.gr, width = 1, fix = 'center'), 
+                                   sample = nexus_bw.list[[y]], upstream = 150, downstream = 151, 
+                                   title = y, order = 'asis', removal_threshold = .8, normalize_threshold = .999,
+                                   return_only_df = T) #.8, .99
+    
+    nexus.plot<-ggplot()+
+      geom_tile(data=nexus.df %>% dplyr::filter(strand == 'pos'), aes(x=position, y=region, fill=signal))+
+      geom_tile(data=nexus.df %>% dplyr::filter(strand == 'neg'), aes(x=position, y=region, fill=-signal), alpha=.5)+
+      ggtitle(paste0('Motif: ', m.gr$name %>% unique, '\nfrom model\n', x), subtitle = paste0('ChIP: ', y))+
+      scale_x_continuous("Position (bp)", expand = c(0, 0))+
+      scale_y_continuous("Regions", expand = c(0, 0))+
+      scale_fill_gradientn(colors = c('#08306b', '#08519c' , '#2171b5', '#4292c6', '#6baed6',
+                                      '#9ecae1', '#c6dbef','#deebf7', '#f7fbff', "white", '#fff5f0',
+                                      '#fee0d2','#fcbba1','#fc9272','#fb6a4a','#ef3b2c','#cb181d','#a50f15','#67000d'), name = "norm. signal") +
+      theme_classic()+
+      theme(text=element_text(size=14), legend.position = "none", panel.grid = element_blank(), panel.border = element_blank())
+    return(nexus.plot)
+  })
+  
+  hm.plot<-wrap_plots(plots_across_motif.list, nrow = 1) 
+  ggsave(paste0(figure_filepath, '/nexus_heatmap_across_', x, '_motifs_ANTHOX1_HTH_HA.png'), hm.plot, height = 6, width = 16)
+  ggsave(paste0(figure_filepath, '/nexus_heatmap_across_', x, '_motifs_ANTHOX1_HTH_HA.pdf'), hm.plot, height = 6, width = 16)
+  return(hm.plot)
+})
+
+hm_all.plot<-logos.plot + wrap_plots(hm_plot_all.list, ncol = 1) 
+ggsave(paste0(figure_filepath, '/nexus_heatmap_across_all_motifs_ANTHOX1_HTH_HA.png'), hm_all.plot, height = 24, width = 16)
+ggsave(paste0(figure_filepath, '/nexus_heatmap_across_all_motifs_ANTHOX1_HTH_HA.pdf'), hm_all.plot, height = 24, width = 16)
+```
+
+# Session Information
+
+For the purposes of reproducibility, the R/Bioconductor session information is printed below:
+
+```{r sessioninfo}
+sessionInfo()
+```
+
+
+
+
+
+
+
+
+
+
+
+

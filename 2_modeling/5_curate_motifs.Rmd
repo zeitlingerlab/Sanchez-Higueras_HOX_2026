@@ -79,11 +79,12 @@ Many motifs were found to be contributing but we will focus on the key specific 
 motifs.list<-list(
   s2_anthox6a_pbx_flag_nexus_fold1_pbx_counts=list('pattern_1'=c('AntHox6a-PBX', 'pos')),
   s2_anthox6a_pbx_ha_nexus_fold1_pbx_counts=list('pattern_0'=c('AntHox6a-PBX', 'pos')),
-  s2_anthox1a_pbx_flag_nexus_fold1_pbx_counts=list('pattern_2'=c('AntHox1a-PBX', 'pos')),
-  s2_anthox1a_pbx_ha_nexus_fold1_pbx_counts=list('pattern_5'=c('AntHox1a-PBX', 'neg'))
   
-  # s2_dfd_hth_exd_nexus_fold1_dfd_counts = list('pattern_1' = c('AntHox6a-PBX', 'neg')),
-  # s2_dfd_hth_ha_nexus_fold1_dfd_counts = list('pattern_0' = c('TTAATGGC', 'pos'))
+  s2_anthox1a_pbx_flag_nexus_fold1_pbx_counts=list('pattern_2'=c('AntHox1a-PBX', 'pos')),
+  s2_anthox1a_pbx_ha_nexus_fold1_pbx_counts=list('pattern_5'=c('AntHox1a-PBX', 'neg')),
+  
+  s2_dfd_hth_exd_nexus_fold1_dfd_counts = list('pattern_1' = c('Dfd-Hth-Exd', 'neg')),
+  s2_dfd_hth_ha_nexus_fold1_dfd_counts = list('pattern_0' = c('TTAATGGC', 'pos'))
 )
 ```
 
@@ -281,6 +282,29 @@ nexus_bw.list<-list(
   #   mclapply(., function(x) {rtracklayer::import.bw(x, as="RleList")}, mc.cores = 2)
   )
 
+nexus_norm_bw.list<-list(
+  S2_AntHOX6a_PBX_Flag = list(pos = 'bw/S2_AntHOX6a_PBX_Flag_nexus_combined_normalized_positive.bw',
+                              neg = 'bw/S2_AntHOX6a_PBX_Flag_nexus_combined_normalized_negative.bw') %>%
+    mclapply(., function(x) {rtracklayer::import.bw(x, as="RleList")}, mc.cores = 2),
+  S2_AntHOX6a_PBX_HA = list(pos = 'bw/S2_AntHOX6a_PBX_HA_nexus_combined_normalized_positive.bw',
+                            neg = 'bw/S2_AntHOX6a_PBX_HA_nexus_combined_normalized_negative.bw') %>%
+    mclapply(., function(x) {rtracklayer::import.bw(x, as="RleList")}, mc.cores = 2),
+  
+  S2_AntHOX1a_PBX_Flag = list(pos = 'bw/S2_AntHOX1a_PBX_Flag_nexus_combined_normalized_positive.bw',
+                              neg = 'bw/S2_AntHOX1a_PBX_Flag_nexus_combined_normalized_negative.bw') %>%
+    mclapply(., function(x) {rtracklayer::import.bw(x, as="RleList")}, mc.cores = 2),
+  S2_AntHOX1a_PBX_HA = list(pos = 'bw/S2_AntHOX1a_PBX_HA_nexus_combined_normalized_positive.bw',
+                            neg = 'bw/S2_AntHOX1a_PBX_HA_nexus_combined_normalized_negative.bw') %>%
+    mclapply(., function(x) {rtracklayer::import.bw(x, as="RleList")}, mc.cores = 2)
+  
+  # S2_Dfd_Hth_HA = list(pos = 'bw/S2_Dfd_Hth_HA_nexus_combined_positive.bw',
+  #                      neg = 'bw/S2_Dfd_Hth_HA_nexus_combined_negative.bw') %>%
+  #   mclapply(., function(x) {rtracklayer::import.bw(x, as="RleList")}, mc.cores = 2),
+  # S2_Dfd_Hth_anti_EXD = list(pos = 'bw/S2_Dfd_Hth_anti_EXD_nexus_combined_positive.bw',
+  #                             neg = 'bw/S2_Dfd_Hth_anti_EXD_nexus_combined_negative.bw') %>%
+  #   mclapply(., function(x) {rtracklayer::import.bw(x, as="RleList")}, mc.cores = 2)
+)
+
 #Define how many motifs to consider
 top_n = 250
 ```
@@ -308,10 +332,14 @@ hm_plot_all.list<-lapply(all_motifs.gr$model %>% unique, function(x){
       scale_x_continuous("Position (bp)", expand = c(0, 0))+
       scale_y_continuous("Regions", expand = c(0, 0))+
       scale_fill_gradientn(colors = c('#08306b', '#08519c' , '#2171b5', '#4292c6', '#6baed6',
-                                      '#9ecae1', '#c6dbef','#deebf7', '#f7fbff', "white", '#fff5f0',
-                                      '#fee0d2','#fcbba1','#fc9272','#fb6a4a','#ef3b2c','#cb181d','#a50f15','#67000d'), name = "norm. signal") +
+                                      '#9ecae1', '#c6dbef','#deebf7', '#f7fbff', "white",
+                                      '#fff5f0','#fee0d2','#fcbba1','#fc9272','#fb6a4a',
+                                      '#ef3b2c','#cb181d','#a50f15','#67000d'), name = "norm. signal") +
+      # scale_fill_gradientn(colors = c('#08306b', '#08519c' , '#2171b5', '#c6dbef','#deebf7', '#f7fbff',
+      #                                 "white", 
+      #                                 '#fff5f0','#fee0d2','#fcbba1','#cb181d','#a50f15','#67000d'), name = "norm. signal") +
       theme_classic()+
-      theme(text=element_text(size=14), legend.position = "none", panel.grid = element_blank(), panel.border = element_blank())
+      theme(text=element_text(size=14), panel.grid = element_blank(), panel.border = element_blank())
     return(nexus.plot)
   }, mc.cores = 4)
   
@@ -320,8 +348,36 @@ hm_plot_all.list<-lapply(all_motifs.gr$model %>% unique, function(x){
 })
 
 hm_all.plot<-wrap_plots(hm_plot_all.list, ncol = 1) 
-ggsave(paste0(figure_filepath, '/nexus_heatmap_across_all_motifs.png'), hm_all.plot, height = 16, width = 16)
-ggsave(paste0(figure_filepath, '/nexus_heatmap_across_all_motifs.pdf'), hm_all.plot, height = 16, width = 16)
+ggsave(paste0(figure_filepath, '/nexus_heatmap_across_all_motifs.png'), hm_all.plot, dpi = 720, height = 24, width = 16)
+ggsave(paste0(figure_filepath, '/nexus_heatmap_across_all_motifs.pdf'), hm_all.plot, height = 24, width = 16)
+```
+
+Plot metapeaks as well
+
+```{r}
+mp.df<-lapply(all_motifs.gr$model %>% unique %>% grep('anthox6', ., value = T), function(x){
+  message(x)
+  pertinent_nexus_sample<-tolower(x) %>% gsub('_nexus_fold1_pbx_counts', '', .)
+  bw<-nexus_norm_bw.list[[names(nexus_norm_bw.list)[grepl(pertinent_nexus_sample, names(nexus_norm_bw.list), ignore.case = T)]]]
+  
+  m.gr<-all_motifs.gr %>% plyranges::filter(model==x) %>% plyranges::arrange(desc(contrib_match)) %>% 
+    head(n=top_n) %>% 
+    plyranges::arrange(contrib_match)
+
+  df<-exo_metapeak(GenomicRanges::resize(m.gr, width = 1, fix = 'center'), bw, upstream = 75, downstream = 76) %>%
+    dplyr::mutate(sample = x)
+  return(df)
+}) %>% rbindlist()
+
+mp.plot<-ggplot(data = mp.df, aes(x = tss_distance, y = reads, group = interaction(strand, sample), color = sample))+
+  geom_line()+
+  scale_x_continuous("Position (bp)")+
+  scale_y_continuous("RPM-norm reads")+
+  theme_classic()+
+  theme(text=element_text(size=14), panel.grid = element_blank(), panel.border = element_blank())
+mp.plot
+ggsave(paste0(figure_filepath, '/nexus_mp_across_anthox6a_motifs.png'), mp.plot, dpi = 720, height = 6, width = 8)
+ggsave(paste0(figure_filepath, '/nexus_mp_across_anthox6a_motifs.pdf'), mp.plot, height = 6, width = 8)
 ```
 
 Report underlying sequences.
@@ -334,6 +390,37 @@ lapply(all_motifs.gr$model %>% unique, function(x){
     plyranges::arrange(contrib_match)
   print(m.gr$seq %>% table %>% sort(decreasing = T)) %>% head(n=5)
 })
+```
+
+Quantify these values
+
+```{r}
+total_reads.df<-lapply(all_motifs.gr$model %>% unique, function(x){
+  message(x)
+  m.gr<-all_motifs.gr %>% plyranges::filter(model==x) %>% plyranges::arrange(desc(contrib_match)) %>% 
+    head(n=top_n)
+  
+  mclapply(names(nexus_bw.list), function(y){
+    data.frame(reads = regionSums(GenomicRanges::resize(m.gr, 150, 'center'), nexus_bw.list[[y]]$pos) + abs(regionSums(GenomicRanges::resize(m.gr, 150, 'center'), nexus_bw.list[[y]]$neg)),
+               sample = y, 
+               model = x)
+  }) %>% rbindlist()
+}) %>% rbindlist()
+
+
+comparisons.list<-list(c('s2_anthox6a_pbx_ha', 's2_anthox1a_pbx_ha'))
+
+quant.plot<-total_reads.df %>% 
+  dplyr::filter(!grepl('Flag', sample), !grepl('flag', model), !grepl('dfd', model)) %>% 
+  dplyr::mutate(model_short = gsub('_nexus_fold1_pbx_counts', '', model)) %>%
+  ggplot(., aes(x = model_short, y = log10(reads+1)))+
+  geom_boxplot(outliers = F) + 
+  facet_wrap(~sample, scales = 'free')+
+  ggpubr::stat_compare_means(method = 'wilcox', comparisons = comparisons.list)+
+  theme_classic()
+  
+ggsave(paste0(figure_filepath, '/quant_cross_binding.png'), quant.plot, dpi = 720, height = 4, width = 5)
+ggsave(paste0(figure_filepath, '/quant_cross_binding.pdf'), quant.plot, height = 4, width = 4)
 ```
 
 
@@ -385,7 +472,6 @@ Find where the precise upper footprints are.
 ```{r}
 # mp.plot<-plot_nexus_metapeak(GenomicRanges::resize(m.gr, 1, 'center'), nexus_bw.list$S2_Dfd_Hth_HA)
 # mp.plot + theme_bw()
-
 ```
 
 ```{r}
@@ -440,9 +526,11 @@ pred.bw.list<-list(
   #   mclapply(., function(x) {rtracklayer::import.bw(x, as="RleList")}, mc.cores = 2)
 )
 
+
+#Anthox1a candidates
 locus.list<-list(
   anthox6a = GRanges('chr2L', IRanges(516200, 516600), strand = '*'),
-  anthox1a = GRanges('chr2R', IRanges(21027100, 21027200), strand = '*')
+  anthox1a = GRanges('chr2R', IRanges(21181100, 21181300), strand = '*')
   # dfd =  GRanges('chr2L', IRanges(14565500, 14565800), strand = '*')
 )
 
@@ -530,6 +618,235 @@ lapply(names(locus.list), function(x){
   
 })
 ```
+
+# Visualize alternate motifs
+
+## Collect alternate motifs
+
+```{r}
+motifs.list<-list(
+  s2_anthox6a_pbx_ha_nexus_fold1_pbx_counts=list('pattern_0'=c('TGATTGA', 'pos'),
+                                                 'pattern_1' = c('GAGA/CLAMP', 'pos'),
+                                                 'pattern_2' = c('TGATGA', 'pos'),
+                                                 'pattern_4' = c('polyTGA', 'pos'))
+)
+
+hits.list<-lapply(names(motifs.list), function(x){
+  message(x)
+  info.df<-motifs.list[[x]] %>% lapply(., function(y) data.frame(motif = y[1], oriented_strand = y[2])) %>% rbindlist(idcol = 'pattern_name')
+  
+  hits.df<-paste0('modiscolite/', x, '/hits.tsv') %>% readr::read_tsv(.)
+  hits_filtered.df<-hits.df %>%
+    dplyr::mutate(model = x) %>%
+    dplyr::filter(pattern_name %in% names(motifs.list[[x]]), metacluster_name == 'pos_patterns') %>%
+    dplyr::left_join(info.df) %>%
+    as.data.frame
+  print(table(hits_filtered.df$motif))
+  return(hits_filtered.df)
+})
+names(hits.list)<-names(motifs.list)
+
+hits_dedup.list<-lapply(names(hits.list), function(modisco_name){
+  #Orient strand to match desired aligned convention
+  gr<-makeGRangesFromDataFrame(hits.list[[modisco_name]], keep.extra.columns = T, starts.in.df.are.0based = T) %>%
+    plyranges::mutate(strand = ifelse(oriented_strand == 'neg',
+                                      ifelse(strand == '-', '+', '-'),
+                                      strand))
+
+  #Import peaks and reduce them to a deduplicated state to get general peak regions.
+  peaks.gr<-gr %>%
+    GenomicRanges::reduce(., ignore.strand = T) %>%
+    plyranges::mutate(region_id_tmp = 1:length(.))
+
+  #Find overlaps between motifs and peaks
+  ov<-findOverlaps(gr, peaks.gr, ignore.strand = T)
+
+  #Assign temporary region ID for deduplication
+  gr$region_id_tmp<-NA
+  gr$region_id_tmp[ov@from]<-peaks.gr$region_id_tmp[ov@to]
+
+  #Filter any motif that doesn't fit into peaks. These would be weird outliers, shouldn't happen, tbh.
+  gr<-gr %>% plyranges::filter(!is.na(gr$region_id_tmp))
+  
+  #Deduplicate any motifs for palindromic mappings
+  dedup.gr<-lapply(unique(gr$motif), function(y){
+    print(y)
+    motifs.gr<-gr %>% plyranges::filter(motif==y)
+    motifs_dedup.gr<-remove_palindromic_motifs_from_bpnet_instances(dfi = motifs.gr, 
+                                                                    pattern_to_filter = y, 
+                                                                    chrom_name = 'seqnames', start_name = 'start', end_name = 'end', 
+                                                                    value_name = 'contrib_match', motif_name = 'motif',
+                                                                    region_name = 'region_id_tmp')
+    print(paste0(length(motifs_dedup.gr) , ' kept from ', length(motifs.gr)))
+    return(motifs_dedup.gr)
+  }) %>% as('GRangesList') %>% unlist(.)
+  return(dedup.gr)
+})
+names(hits_dedup.list)<-names(hits.list)
+
+hits.gr<-hits_dedup.list %>% as('GRangesList') %>% unlist()
+names(hits.gr)<-NULL
+
+all_alternate_motifs.gr<-hits.gr %>%
+  plyranges::mutate(motif_id = 0:(length(.)-1), #0-based indexing later might come in handy
+                    seq = getSeq(bsgenome, ., as.character = T))
+
+all_alternate_motifs.gr$motif %>% table
+```
+
+## Check whether they are bound
+
+```{r}
+
+alternate_mps.df<-lapply(all_alternate_motifs.gr$motif %>% unique, function(x){
+  gr<-GenomicRanges::resize(all_alternate_motifs.gr %>% 
+                                                    plyranges::filter(motif==x), 
+                                                  width = 1, fix = 'center') %>%
+    plyranges::arrange(desc(contrib_match)) %>%
+    head(n=500)
+  obs.df<-exo_metapeak(gr = gr, 
+                       sample = nexus_bw.list$S2_AntHOX6a_PBX_HA, 
+                       upstream = 150, downstream = 151) %>%
+    dplyr::mutate(motif = x)
+}) %>% rbindlist()
+
+alternate_mp.plot<-ggplot(alternate_mps.df, aes(tss_distance, reads, group=interaction(motif,strand), color = motif))+
+  geom_line()+
+  scale_x_continuous(name = "Position wrt motif (bp)")+
+  scale_y_continuous(name = "Reads")+
+  theme_classic()+
+  facet_wrap(~motif)+
+  theme(text=element_text(size=14))
+alternate_mp.plot
+  
+
+```
+
+
+## Visualize PWMs and CWMs from TF-MoDISco
+
+```{r}
+# system(paste0('rm ', figure_filepath, '/unaligned_seqlets/seqlet_logo_*'))
+
+#Plot all seqlet PWM and CWM logos
+pwm_and_cwm.logo.list<-lapply(names(motifs.list), function(x){
+  message(x)
+  info.df<-motifs.list[[x]] %>% lapply(., function(y) data.frame(motif = y[1], 
+                                                                 oriented_strand = y[2])) %>% 
+    rbindlist(idcol = 'pattern_name')
+  
+  lapply(1:nrow(info.df), function(y){
+    s.hdf5<-rhdf5::h5read(paste0('modiscolite/', x, '/modisco.h5'),
+                          paste0('pos_patterns/', info.df$pattern_name[y]))
+    cwm<-s.hdf5$contrib_scores
+    pwm<-ppm_to_ic(s.hdf5$sequence, bg_freq = c(.3, .2, .2, .3))
+    
+    #Orient strand
+    if(info.df$oriented_strand[y]=='neg'){
+      cwm<-cwm[nrow(cwm):1,ncol(cwm):1]
+      pwm<-pwm[nrow(pwm):1,ncol(pwm):1]
+    }
+    
+    rownames(cwm)<-c('A','C','G','T')
+    rownames(pwm)<-c('A','C','G','T')
+    pwm_and_cwm.list<-list(pwm = pwm, cwm = cwm)
+    y_prefix<-paste0(x %>% gsub('_fold1', '', .) %>% gsub('_pbx_counts', '', .) %>% gsub('_dfd_counts', '', .))
+    names(pwm_and_cwm.list)<-paste0(info.df$motif[y], c('_pwm', '_cwm'))
+    
+    pwm_and_cwm.logo<-ggseqlogo(pwm_and_cwm.list, method='custom', seq_type='dna') + 
+      facet_wrap(~seq_group, nrow = 1, scales='free') +
+      theme(axis.text.x = element_blank())
+  }) %>% wrap_plots(ncol = 1)
+})
+
+pwm_and_cwm.logo.list
+
+```
+
+# Visualize alternative HOX motifs
+
+## In vivo metapeaks
+
+Given the different allowed affinities, how does each TF bind?
+
+```{r}
+candidates.vec<-c('TGATTGAT', 'TGATTAAT', 'TGATTTAT')
+
+alternate_hox.df<-lapply(all_motifs.gr$model %>% unique %>% grep('anthox', ., value = T), function(x){
+  message(x)
+  m.gr<-all_motifs.gr %>% plyranges::filter(model==x) 
+  nexus_name<-grep(gsub('_nexus_fold1_pbx_counts', '', x), names(nexus_bw.list), value = T, ignore.case = T)
+  
+  all.df<-mclapply(candidates.vec, function(y){
+    
+    alt.gr<-m.gr %>% plyranges::filter(grepl(y, seq)) %>% 
+      # head(n=top_n) %>% 
+      plyranges::arrange(contrib_match)
+    
+    df<-exo_metapeak(gr = GenomicRanges::resize(alt.gr, width = 1, fix = 'center'), sample = nexus_bw.list[[nexus_name]], 
+                     upstream = 150, downstream = 151) %>% 
+      dplyr::mutate(seq = y, model = nexus_name, motif_count = length(alt.gr))
+  }, mc.cores = 4) %>% rbindlist()
+  return(all.df)
+}) %>% rbindlist()
+
+alternate_hox.df %>% dplyr::select(model, seq, motif_count) %>% unique()
+
+metaplots.plot<-alternate_hox.df %>% dplyr::filter(!grepl('Flag', model)) %>% 
+  ggplot(., aes(x = tss_distance, y = reads, group = interaction(strand, seq), color = seq))+
+  geom_line()+
+  facet_grid(model ~ ., scales = 'free')+
+  theme_classic()
+metaplots.plot
+```
+
+Unexpected! But interesting. Are these regions more accessible in S2 cells?
+
+## In silico marginalizations
+
+```{r}
+marg_raw.df<-Sys.glob('tsv/insilico/insilico_hox_marginalizations_s2_anthox*a_pbx_ha_nexus.tsv.gz') %>%
+  lapply(., function(x) readr::read_tsv(x) %>% dplyr::mutate(tf = basename(x) %>% gsub('insilico_hox_marginalizations_s2_', '', .) %>% gsub('_pbx_ha_nexus.tsv.gz','',.))) %>%
+  rbindlist()
+
+marg.df<-marg_raw.df %>%
+  dplyr::filter(seqA != 'none') %>%
+  dplyr::rename(marg_inj = pbx) %>%
+  dplyr::left_join(marg_raw.df %>% dplyr::filter(seqA=='none') %>% dplyr::rename(marg_null = pbx) %>% dplyr::select(marg_null, tf)) %>%
+  dplyr::mutate(marg = marg_inj - marg_null)
+
+marg.plot<-ggplot(marg.df, aes(x = tf, y = marg, fill = seqA))+
+  geom_bar(stat = 'identity', position = 'dodge')+
+  theme_classic()
+  
+
+plot<-metaplots.plot + marg.plot
+ggsave(paste0(figure_filepath, '/affinity_checks.png'), plot, height = 6, width = 12)
+ggsave(paste0(figure_filepath, '/affinity_checks.pdf'), plot, height = 6, width = 12)
+```
+
+Also show this for Flag condition.
+
+```{r}
+marg_raw.df<-Sys.glob('tsv/insilico/insilico_hox_marginalizations_s2_anthox*_nexus.tsv.gz') %>%
+  lapply(., function(x) readr::read_tsv(x) %>% dplyr::mutate(tf = basename(x) %>% gsub('insilico_hox_marginalizations_s2_', '', .))) %>%
+  rbindlist()
+
+marg.df<-marg_raw.df %>%
+  dplyr::filter(seqA != 'none') %>%
+  dplyr::rename(marg_inj = pbx) %>%
+  dplyr::left_join(marg_raw.df %>% dplyr::filter(seqA=='none') %>% dplyr::rename(marg_null = pbx) %>% dplyr::select(marg_null, tf)) %>%
+  dplyr::mutate(marg = marg_inj - marg_null)
+ 
+marg.plot<-ggplot(marg.df, aes(x = tf, y = marg, fill = seqA))+
+  geom_bar(stat = 'identity', position = 'dodge')+
+  theme_classic()
+  
+plot<-marg.plot
+ggsave(paste0(figure_filepath, '/affinity_checks_w_all.png'), plot, height = 6, width =12)
+ggsave(paste0(figure_filepath, '/affinity_checks_w_all.pdf'), plot, height = 6, width = 12)
+```
+
 
 # Conclusions
 
