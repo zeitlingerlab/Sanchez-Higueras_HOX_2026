@@ -62,6 +62,7 @@ library(ggseqlogo)
 threads <- 5
 dir.create('bed/mapped_motifs', recursive = T, showWarnings = F)
 dir.create('tsv/mapped_motifs', recursive = T, showWarnings = F)
+dir.create('tsv/intermediate_data/tmp', recursive = T, showWarnings = F)
 dir.create('rdata/mapped_motifs', recursive = T, showWarnings = F)
 bsgenome<-BSgenome.Dmelanogaster.UCSC.dm6
 txdb<-TxDb.Dmelanogaster.UCSC.dm6.ensGene
@@ -236,6 +237,12 @@ pwm_and_cwm.logo.list<-lapply(all_motifs.gr$model %>% unique, function(x){
   
   rownames(cwm)<-c('A','C','G','T')
   rownames(pwm)<-c('A','C','G','T')
+  
+  rbind(
+    pwm %>% t() %>% as.data.frame() %>% dplyr::mutate(model = x, position = 1:nrow(.))
+  ) %>%
+    readr::write_tsv(., paste0('tsv/intermediate_data/tmp/f4c_logos_from_', x, '.tsv.gz'))
+
   pwm_and_cwm.list<-list(pwm = pwm, cwm = cwm)
   y_prefix<-paste0(x %>% gsub('_fold1', '', .) %>% gsub('_pbx_counts', '', .) %>% gsub('_dfd_counts', '', .))
   names(pwm_and_cwm.list)<-paste0(y_prefix, c('_pwm', '_cwm'))
@@ -251,6 +258,23 @@ pwm_and_cwm_all.logo<-wrap_plots(pwm_and_cwm.logo.list, ncol = 1)
 ggsave(paste0(figure_filepath, '/seqlet_logos.png'), pwm_and_cwm_all.logo, height = 8, width = 10)
 ggsave(paste0(figure_filepath, '/seqlet_logos.pdf'), pwm_and_cwm_all.logo, height = 8, width = 10)
 ```
+
+Organize intermediate data.
+
+```{r}
+rbind(
+  readr::read_tsv('tsv/intermediate_data/tmp/f4c_logos_from_s2_anthox1a_pbx_ha_nexus_fold1_pbx_counts.tsv.gz'),
+  readr::read_tsv('tsv/intermediate_data/tmp/f4c_logos_from_s2_anthox6a_pbx_ha_nexus_fold1_pbx_counts.tsv.gz')
+) %>%
+  readr::write_tsv(., 'tsv/intermediate_data/f4d_logos.tsv')
+
+rbind(
+  readr::read_tsv('tsv/intermediate_data/tmp/f4c_logos_from_s2_anthox1a_pbx_flag_nexus_fold1_pbx_counts.tsv.gz'),
+  readr::read_tsv('tsv/intermediate_data/tmp/f4c_logos_from_s2_anthox6a_pbx_flag_nexus_fold1_pbx_counts.tsv.gz')
+) %>%
+  readr::write_tsv(., 'tsv/intermediate_data/sf23f_logos.tsv')
+```
+
 
 # Visualize ChIP-nexus coverage
 
@@ -311,6 +335,8 @@ top_n = 250
 
 ## Plot coverage
 
+### Heatmaps
+
 ```{r}
 hm_plot_all.list<-lapply(all_motifs.gr$model %>% unique, function(x){
   message(x)
@@ -320,10 +346,17 @@ hm_plot_all.list<-lapply(all_motifs.gr$model %>% unique, function(x){
   print(m.gr$seq %>% table %>% sort(decreasing = T))
   
   plots_across_motif.list<-mclapply(names(nexus_bw.list), function(y){
+    
     nexus.df<-plot_nexus_heatmap(regions.gr = GenomicRanges::resize(m.gr, width = 1, fix = 'center'), 
                                    sample = nexus_bw.list[[y]], upstream = 150, downstream = 151, 
                                    title = y, order = 'asis', removal_threshold = .8, normalize_threshold = .999,
                                    return_only_df = T) #.8, .99
+    
+    if(tolower(y)==gsub('_nexus_fold1_pbx_counts', '', x)){
+      message(y, ' across motifs ', x)
+      nexus.df %>% dplyr::select(-original_idx) %>% dplyr::mutate(chip = tolower(y), model = x) %>%
+        readr::write_tsv(., paste0('tsv/intermediate_data/tmp/f4c_', tolower(y), '_across_motifs_from_', x, '.tsv.gz'))
+    }
     
     nexus.plot<-ggplot()+
       geom_tile(data=nexus.df %>% dplyr::filter(strand == 'pos'), aes(x=position, y=region, fill=signal))+
@@ -352,6 +385,18 @@ ggsave(paste0(figure_filepath, '/nexus_heatmap_across_all_motifs.png'), hm_all.p
 ggsave(paste0(figure_filepath, '/nexus_heatmap_across_all_motifs.pdf'), hm_all.plot, height = 24, width = 16)
 ```
 
+Organize intermediate data.
+
+```{r}
+Sys.glob('tsv/intermediate_data/tmp/f4c_s2_*_ha_*.tsv.gz') %>% lapply(., function(x) readr::read_tsv(x)) %>% rbindlist() %>%
+  readr::write_tsv(., 'tsv/intermediate_data/f4c_heatmaps.tsv')
+
+Sys.glob('tsv/intermediate_data/tmp/f4c_s2_*_flag_*.tsv.gz') %>% lapply(., function(x) readr::read_tsv(x)) %>% rbindlist() %>%
+  readr::write_tsv(., 'tsv/intermediate_data/sf23f_heatmaps.tsv')
+```
+
+### Metapeaks
+
 Plot metapeaks as well
 
 ```{r}
@@ -365,11 +410,13 @@ mp.df<-lapply(all_motifs.gr$model %>% unique %>% grep('anthox6', ., value = T), 
     plyranges::arrange(contrib_match)
 
   df<-exo_metapeak(GenomicRanges::resize(m.gr, width = 1, fix = 'center'), bw, upstream = 75, downstream = 76) %>%
-    dplyr::mutate(sample = x)
+    dplyr::mutate(sample = pertinent_nexus_sample, model = x)
   return(df)
 }) %>% rbindlist()
 
-mp.plot<-ggplot(data = mp.df, aes(x = tss_distance, y = reads, group = interaction(strand, sample), color = sample))+
+readr::write_tsv(mp.df %>% dplyr::rename(position = tss_distance) %>% dplyr::select(-sample_name), 'tsv/intermediate_data/sf23g_average_profiles.tsv')
+
+mp.plot<-ggplot(data = mp.df, aes(x = tss_distance, y = reads, group = interaction(strand, model), color = model))+
   geom_line()+
   scale_x_continuous("Position (bp)")+
   scale_y_continuous("RPM-norm reads")+
@@ -392,6 +439,8 @@ lapply(all_motifs.gr$model %>% unique, function(x){
 })
 ```
 
+### Quantification
+
 Quantify these values
 
 ```{r}
@@ -407,9 +456,18 @@ total_reads.df<-lapply(all_motifs.gr$model %>% unique, function(x){
   }) %>% rbindlist()
 }) %>% rbindlist()
 
+#Report statistical tests
+wilcox.test(
+  total_reads.df %>% dplyr::filter(model=='s2_anthox6a_pbx_ha_nexus_fold1_pbx_counts', sample=='S2_AntHOX1a_PBX_HA') %>% .$reads,
+  total_reads.df %>% dplyr::filter(model=='s2_anthox1a_pbx_ha_nexus_fold1_pbx_counts', sample=='S2_AntHOX1a_PBX_HA') %>% .$reads
+) 
+
+wilcox.test(
+  total_reads.df %>% dplyr::filter(model=='s2_anthox6a_pbx_ha_nexus_fold1_pbx_counts', sample=='S2_AntHOX6a_PBX_HA') %>% .$reads,
+  total_reads.df %>% dplyr::filter(model=='s2_anthox1a_pbx_ha_nexus_fold1_pbx_counts', sample=='S2_AntHOX6a_PBX_HA') %>% .$reads
+)
 
 comparisons.list<-list(c('s2_anthox6a_pbx_ha', 's2_anthox1a_pbx_ha'))
-
 quant.plot<-total_reads.df %>% 
   dplyr::filter(!grepl('Flag', sample), !grepl('flag', model), !grepl('dfd', model)) %>% 
   dplyr::mutate(model_short = gsub('_nexus_fold1_pbx_counts', '', model)) %>%
@@ -418,81 +476,16 @@ quant.plot<-total_reads.df %>%
   facet_wrap(~sample, scales = 'free')+
   ggpubr::stat_compare_means(method = 'wilcox', comparisons = comparisons.list)+
   theme_classic()
-  
+
 ggsave(paste0(figure_filepath, '/quant_cross_binding.png'), quant.plot, dpi = 720, height = 4, width = 5)
 ggsave(paste0(figure_filepath, '/quant_cross_binding.pdf'), quant.plot, height = 4, width = 4)
+
+#Save intermediate data
+readr::write_tsv(total_reads.df %>% 
+                   dplyr::filter(!grepl('Flag', sample), !grepl('flag', model), !grepl('dfd', model)), 
+                 'tsv/intermediate_data/f4e_boxplots.tsv')
 ```
 
-
-## Clarify coverage by sequence
-
-Does Dfd-HA bind in exclusively heterodimeric or monomeric conformations? Sort upstream sequences from the TTAAT core and check.
-
-```{r}
-# all_motifs.gr %>% plyranges::filter(model=='s2_dfd_hth_ha_nexus_fold1_dfd_counts') %>% as.data.frame %>% ggplot(., aes(x = contrib_magnitude))+geom_density()
-# 
-# m.gr<-all_motifs.gr %>% plyranges::filter(model=='s2_dfd_hth_ha_nexus_fold1_dfd_counts') %>% 
-#   plyranges::filter(contrib_magnitude>=0.1) %>%
-#   plyranges::mutate(upstream_seq = getSeq(bsgenome, 
-#                                           GenomicRanges::resize(
-#                                             GenomicRanges::resize(
-#                                               GenomicRanges::resize(., 1, 'start'), 4, 'end'), 3, 'start'))) %>%
-#   plyranges::arrange(upstream_seq, desc(contrib_match))
-# 
-# 
-# seq.list<-plot_sequence(m.gr, title = 'Dfd motifs', genome = bsgenome, window = 15, show = F)
-# seq.plot<-seq.list$plot
-# 
-# nexus.df<-plot_nexus_heatmap(regions.gr = GenomicRanges::resize(m.gr, width = 1, fix = 'center'), 
-#                                    sample = nexus_bw.list$S2_Dfd_Hth_HA, upstream = 150, downstream = 151, 
-#                                    title = y, order = 'asis', removal_threshold = .8, normalize_threshold = .99,
-#                                    return_only_df = T)
-#     
-# nexus.plot<-ggplot()+
-#   geom_tile(data=nexus.df %>% dplyr::filter(strand == 'pos'), aes(x=position, y=region, fill=signal))+
-#   geom_tile(data=nexus.df %>% dplyr::filter(strand == 'neg'), aes(x=position, y=region, fill=-signal), alpha=.5)+
-#   ggtitle(paste0('Sequence separated motif'))+
-#   scale_x_continuous("Position (bp)", expand = c(0, 0))+
-#   scale_y_continuous("Regions", expand = c(0, 0))+
-#   scale_fill_gradientn(colors = c('#08306b', '#08519c' , '#2171b5', '#4292c6', '#6baed6',
-#                                   '#9ecae1', '#c6dbef','#deebf7', '#f7fbff', "white", '#fff5f0',
-#                                   '#fee0d2','#fcbba1','#fc9272','#fb6a4a','#ef3b2c','#cb181d','#a50f15','#67000d'), 
-#                        name = "norm. signal") +
-#   theme_classic()+
-#   theme(text=element_text(size=14), legend.position = "none", panel.grid = element_blank(), panel.border = element_blank())
-# 
-# seq_separated.plot<-seq.plot + nexus.plot
-# seq_separated.plot
-# ggsave(paste0(figure_filepath, '/nexus_heatmap_across_seq_separated_dfd.png'), seq_separated.plot, height = 6, width = 12)
-# ggsave(paste0(figure_filepath, '/nexus_heatmap_across_seq_separated_dfd.pdf'), seq_separated.plot, height = 6, width = 12)
-```
-
-Find where the precise upper footprints are.
-
-```{r}
-# mp.plot<-plot_nexus_metapeak(GenomicRanges::resize(m.gr, 1, 'center'), nexus_bw.list$S2_Dfd_Hth_HA)
-# mp.plot + theme_bw()
-```
-
-```{r}
-# #Collect positive strand coverage
-# m_w_peaks.gr<-m.gr %>% 
-#   keepStandardChromosomes(.) %>%
-#   plyranges::mutate(monomeric_peak = regionSums(GenomicRanges::resize(., 3, 'center'), nexus_bw.list$S2_Dfd_Hth_HA$pos),
-#                     hereodimeric_peak = regionSums(GenomicRanges::resize(GenomicRanges::resize(GenomicRanges::resize(., 1, 'center'), 12, 'end'), 3, 'start'), nexus_bw.list$S2_Dfd_Hth_HA$pos))
-# 
-# #Contrast positive strand coverage
-# 
-# cor(m_w_peaks.gr$monomeric_peak, m_w_peaks.gr$hereodimeric_peak)
-# 
-# ggplot(m_w_peaks.gr %>% as.data.frame, aes(x = monomeric_peak, y = hereodimeric_peak))+
-#   geom_point() + 
-#   scale_x_continuous(limits = c(0, 200))+
-#   scale_y_continuous(limits = c(0, 200))
-                    
-```
-
-Seems like there is no hidden upstream heterodimeric component for this experiment.
 
 # Visualize predictions across key locus
 
@@ -547,7 +540,7 @@ contrib.bw.list<-list(
 ## Visualize predictions
 
 ```{r}
-lapply(names(locus.list), function(x){
+f4a.df<-lapply(names(locus.list), function(x){
   message(x)
   
   locus.gr<-locus.list[[x]]
@@ -616,7 +609,27 @@ lapply(names(locus.list), function(x){
   ggsave(paste0(figure_filepath, '/featured_locus_predictions_', x, '.png'), pred.plot, height = 6, width = 12)
   ggsave(paste0(figure_filepath, '/featured_locus_predictions_', x, '.pdf'), pred.plot, height = 6, width = 12)
   
-})
+  #Save intermediate datasets
+  intermediate.df<-dplyr::bind_rows(
+    #Profiles
+    all.df,
+    
+    #Contributions
+    contrib.mat.list %>% lapply(., function(z) colSums(z)) %>% as.data.frame() %>% 
+      dplyr::mutate(genomic_coordinate = min(all.df$genomic_coordinate):max(all.df$genomic_coordinate)) %>%
+      tidyr::pivot_longer(cols = names(contrib.mat.list), names_to = 'sample', values_to = 'reads') %>%
+      dplyr::mutate(type = 'BPNet contribution score')
+  ) %>% dplyr::select(-sample_name, -tss_distance) %>%
+    dplyr::mutate(featured_locus_factor = x)
+    
+  
+  return(intermediate.df)
+  
+}) %>% rbindlist()
+
+head(f4a.df)
+readr::write_tsv(f4a.df %>% dplyr::filter(featured_locus_factor=='anthox1a'), 'tsv/intermediate_data/f4a_profiles.tsv')
+readr::write_tsv(f4a.df %>% dplyr::filter(featured_locus_factor=='anthox6a'), 'tsv/intermediate_data/f4b_profiles.tsv')
 ```
 
 # Visualize alternate motifs
@@ -815,6 +828,9 @@ marg.df<-marg_raw.df %>%
   dplyr::left_join(marg_raw.df %>% dplyr::filter(seqA=='none') %>% dplyr::rename(marg_null = pbx) %>% dplyr::select(marg_null, tf)) %>%
   dplyr::mutate(marg = marg_inj - marg_null)
 
+#Save intermediate data
+readr::write_tsv(marg.df %>% dplyr::select(-c(motifA, seqB, motifB, state)) %>% dplyr::rename(model = tf), 'tsv/intermediate_data/f4f_injections.tsv')
+
 marg.plot<-ggplot(marg.df, aes(x = tf, y = marg, fill = seqA))+
   geom_bar(stat = 'identity', position = 'dodge')+
   theme_classic()
@@ -838,6 +854,9 @@ marg.df<-marg_raw.df %>%
   dplyr::left_join(marg_raw.df %>% dplyr::filter(seqA=='none') %>% dplyr::rename(marg_null = pbx) %>% dplyr::select(marg_null, tf)) %>%
   dplyr::mutate(marg = marg_inj - marg_null)
  
+#Save intermediate data (keep only Flag, HA is above)
+readr::write_tsv(marg.df %>% dplyr::select(-c(motifA, seqB, motifB, state)) %>% dplyr::rename(model = tf) %>% dplyr::filter(grepl('flag', model)), 'tsv/intermediate_data/sf23h_injections.tsv')
+
 marg.plot<-ggplot(marg.df, aes(x = tf, y = marg, fill = seqA))+
   geom_bar(stat = 'identity', position = 'dodge')+
   theme_classic()
@@ -846,7 +865,6 @@ plot<-marg.plot
 ggsave(paste0(figure_filepath, '/affinity_checks_w_all.png'), plot, height = 6, width =12)
 ggsave(paste0(figure_filepath, '/affinity_checks_w_all.pdf'), plot, height = 6, width = 12)
 ```
-
 
 # Conclusions
 

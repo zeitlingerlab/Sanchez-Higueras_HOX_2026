@@ -206,8 +206,8 @@ filler<-lapply(all_samples %>% grep('nexus', ., value = T), function(x){
   combined.bw<-Reduce(f = "+", x = c(pos_combined.list, neg_combined.list))
   rtracklayer::export(combined.bw, paste0('bw/', x, '_combined_grouped.bw'), format = "BigWig")
   
-  total_reads<-(lapply(pos_combined.bw, function(x) return(x@values %>% sum)) %>% unlist %>% sum) + 
-    (lapply(neg_combined.bw, function(x) return(x@values %>% sum)) %>% unlist %>% sum)
+  total_reads<-(lapply(pos_combined.bw, function(x) return((x@values*x@lengths) %>% sum)) %>% unlist %>% sum) + 
+    (lapply(neg_combined.bw, function(x) return((x@values*x@lengths) %>% sum)) %>% unlist %>% sum)
   
   pos_rpm.bw<-pos_combined.bw/total_reads*1000000
   rtracklayer::export(pos_rpm.bw, paste0('bw/', x, '_combined_normalized_positive.bw'), format = "BigWig")

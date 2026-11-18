@@ -11,7 +11,7 @@
 
 <meta name="author" content="Melanie (1028-02098-001-001)" />
 
-<meta name="date" content="2026-07-31" />
+<meta name="date" content="2026-11-17" />
 
 <title>Data preparation</title>
 
@@ -1493,7 +1493,7 @@ border-radius: 0px;
 
 <h1 class="title toc-ignore">Data preparation</h1>
 <h4 class="author">Melanie (1028-02098-001-001)</h4>
-<h4 class="date">July 31, 2026</h4>
+<h4 class="date">November 17, 2026</h4>
 
 </div>
 
@@ -1660,8 +1660,8 @@ single_value_rlelist &lt;- function(value, lengths) {
   combined.bw&lt;-Reduce(f = &quot;+&quot;, x = c(pos_combined.list, neg_combined.list))
   rtracklayer::export(combined.bw, paste0(&#39;bw/&#39;, x, &#39;_combined_grouped.bw&#39;), format = &quot;BigWig&quot;)
   
-  total_reads&lt;-(lapply(pos_combined.bw, function(x) return(x@values %&gt;% sum)) %&gt;% unlist %&gt;% sum) + 
-    (lapply(neg_combined.bw, function(x) return(x@values %&gt;% sum)) %&gt;% unlist %&gt;% sum)
+  total_reads&lt;-(lapply(pos_combined.bw, function(x) return((x@values*x@lengths) %&gt;% sum)) %&gt;% unlist %&gt;% sum) + 
+    (lapply(neg_combined.bw, function(x) return((x@values*x@lengths) %&gt;% sum)) %&gt;% unlist %&gt;% sum)
   
   pos_rpm.bw&lt;-pos_combined.bw/total_reads*1000000
   rtracklayer::export(pos_rpm.bw, paste0(&#39;bw/&#39;, x, &#39;_combined_normalized_positive.bw&#39;), format = &quot;BigWig&quot;)
@@ -1762,13 +1762,13 @@ information is printed below:</p>
 ## [17] UCSC.utils_1.0.0            purrr_1.0.2                
 ## [19] bit_4.6.0                   xfun_0.51                  
 ## [21] zlibbioc_1.50.0             cachem_1.1.0               
-## [23] jsonlite_1.8.9              blob_1.2.4                 
+## [23] jsonlite_2.0.0              blob_1.2.4                 
 ## [25] DelayedArray_0.30.1         BiocParallel_1.38.0        
 ## [27] R6_2.5.1                    bslib_0.8.0                
 ## [29] stringi_1.8.4               jquerylib_0.1.4            
 ## [31] cellranger_1.1.0            Rcpp_1.0.14                
 ## [33] SummarizedExperiment_1.34.0 knitr_1.50                 
-## [35] Matrix_1.7-0                tidyselect_1.2.1           
+## [35] Matrix_1.7-6                tidyselect_1.2.1           
 ## [37] rstudioapi_0.17.1           abind_1.4-8                
 ## [39] yaml_2.3.10                 codetools_0.2-20           
 ## [41] curl_6.2.1                  tibble_3.2.1               
